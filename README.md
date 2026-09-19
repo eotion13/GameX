@@ -13,12 +13,15 @@ Die vollständigen Regeln: [RULES.md](RULES.md) – oder in der App unter „Reg
 
 **Variante A – GitHub Pages (empfohlen)**
 
-1. Der Workflow `.github/workflows/pages.yml` läuft bei jedem Push und schaltet
-   Pages beim ersten Mal selbst ein. Falls das an fehlenden Rechten scheitert:
-   *Settings → Pages → Source:* **GitHub Actions** setzen und den Workflow unter
-   *Actions* erneut starten.
-2. Die Adresse `https://eotion13.github.io/GameX/` auf dem iPhone in Safari öffnen.
-3. **Teilen → Zum Home-Bildschirm.** Die App startet danach ohne Browser-Leiste
+1. **Einmalig von Hand:** *Settings → Pages → Source:* **GitHub Actions**.
+   Diesen Schritt kann der Workflow nicht selbst erledigen – das Token einer
+   Action darf eine Pages-Site nicht anlegen, das darf nur ein Repo-Admin.
+   Solange Pages aus ist, schlägt der Deploy-Workflow mit
+   *„Create Pages site failed: Resource not accessible by integration“* fehl.
+2. Unter *Actions* den Workflow **Auf GitHub Pages veroeffentlichen** erneut
+   starten (oder einfach den nächsten Commit pushen).
+3. Die Adresse `https://eotion13.github.io/GameX/` auf dem iPhone in Safari öffnen.
+4. **Teilen → Zum Home-Bildschirm.** Die App startet danach ohne Browser-Leiste
    im Vollbild und läuft dank Service Worker auch offline.
 
 **Variante B – lokal im WLAN**
