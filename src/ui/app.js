@@ -410,7 +410,7 @@ function viewOrders() {
           ${cur ? `<span class="badge">${cur.action === 'bewegen' ? '→' : '⇢'} ${esc(nodeName(g, cur.target))}</span>` : '<span class="badge">hält</span>'}
         </div>
         <div class="knopfreihe">
-          <button class="${!cur ? 'aktiv' : ''}" data-action="halten">Halten</button>
+          <button class="${!cur && !sel.mode ? 'aktiv' : ''}" data-action="halten">Halten</button>
           <button class="${sel.mode === 'bewegen' ? 'aktiv' : ''}" data-action="modus-bewegen">Bewegen</button>
           <button class="${sel.mode === 'unterstuetzen' ? 'aktiv' : ''}" ${supportable ? '' : 'disabled'} data-action="modus-stuetzen">Unterstützen</button>
           <button data-action="abwaehlen">Fertig</button>
