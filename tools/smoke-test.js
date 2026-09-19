@@ -130,9 +130,6 @@ try {
   await schuss('3-befehle');
 
   // --- Einer Einheit einen Zug geben ---------------------------------------
-  const meinFeld = await cdp.js(`(() => {
-    const g = window.__knoten;
-    return null; })()`);
   // Einheit ueber das DOM finden: eigene Einheiten haben die Klasse "eigen"
   const eigenerKnoten = await cdp.js(`(() => {
     const kreise = [...document.querySelectorAll('.einheit.eigen')];

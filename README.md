@@ -13,10 +13,12 @@ Die vollständigen Regeln: [RULES.md](RULES.md) – oder in der App unter „Reg
 
 **Variante A – GitHub Pages (empfohlen)**
 
-1. Im Repository: *Settings → Pages → Source:* **GitHub Actions**.
-2. Diesen Branch pushen. Der Workflow `.github/workflows/pages.yml` veröffentlicht die App.
-3. Die Adresse `https://eotion13.github.io/GameX/` auf dem iPhone in Safari öffnen.
-4. **Teilen → Zum Home-Bildschirm.** Die App startet danach ohne Browser-Leiste
+1. Der Workflow `.github/workflows/pages.yml` läuft bei jedem Push und schaltet
+   Pages beim ersten Mal selbst ein. Falls das an fehlenden Rechten scheitert:
+   *Settings → Pages → Source:* **GitHub Actions** setzen und den Workflow unter
+   *Actions* erneut starten.
+2. Die Adresse `https://eotion13.github.io/GameX/` auf dem iPhone in Safari öffnen.
+3. **Teilen → Zum Home-Bildschirm.** Die App startet danach ohne Browser-Leiste
    im Vollbild und läuft dank Service Worker auch offline.
 
 **Variante B – lokal im WLAN**

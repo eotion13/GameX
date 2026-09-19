@@ -1,9 +1,9 @@
 // Knotenpunkt - Oberflaeche und Spielablauf.
 
-import { createGame, occupancy, standings, majority, teamMembers } from '../engine/state.js';
+import { createGame, occupancy, standings, majority } from '../engine/state.js';
 import { resolve } from '../engine/resolver.js';
 import { botOrders, mulberry32 } from '../engine/bots.js';
-import { TYPES, TYPE_INFO, CONFIG, PLAYER_NAMES } from '../engine/rules.js';
+import { TYPES, TYPE_INFO, PLAYER_NAMES } from '../engine/rules.js';
 import { boardSvg } from './board.js';
 import { describeEvent, nodeName, winnerText } from './text.js';
 import { rulesHtml } from './rules-text.js';

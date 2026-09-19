@@ -24,6 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+        # Schaltet GitHub Pages beim ersten Lauf selbst ein.
+        with:
+          enablement: true
       - name: Statische Dateien einsammeln
         run: |
           mkdir -p _site
