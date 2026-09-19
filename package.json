@@ -1,0 +1,13 @@
+{
+  "name": "knotenpunkt",
+  "version": "1.0.0",
+  "description": "Knotenpunkt - ein strategisches Multiplayer-Logikspiel ohne Zufall (Web-App)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "sim": "node tools/simulate.js",
+    "serve": "node tools/serve.js"
+  },
+  "license": "MIT"
+}
