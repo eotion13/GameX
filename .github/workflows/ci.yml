@@ -20,5 +20,9 @@ jobs:
         run: node tools/smoke-test.js
         env:
           CHROME: /usr/bin/google-chrome
+      - name: Online-Modus im Browser testen
+        run: node tools/online-smoke.js
+        env:
+          CHROME: /usr/bin/google-chrome
       - name: Balance stichprobenartig pruefen
         run: node tools/simulate.js 120 3

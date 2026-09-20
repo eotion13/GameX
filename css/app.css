@@ -222,6 +222,56 @@ button.aktiv { background: var(--spieler); border-color: var(--spieler); color: 
 .regeln .typen li { background: var(--karte); border-radius: 8px; padding: 8px 12px; }
 .regeln .aktionen { margin-top: 20px; }
 
+/* ----------------------------------------------------------------- Online */
+.fehler {
+  background: #3a1f24; border: 1px solid #7a3b46; color: #ffd9de;
+  border-radius: 10px; padding: 10px 12px; font-size: .88rem; margin: 0 0 4px;
+}
+
+.eingabe {
+  width: 100%; box-sizing: border-box;
+  background: var(--bg-2); color: var(--text);
+  border: 1px solid var(--rand); border-radius: 10px;
+  padding: 12px; font: inherit;
+  font-size: 16px; /* darunter zoomt iOS beim Antippen hinein */
+  min-height: 46px;
+}
+.eingabe:focus { outline: 2px solid var(--spieler); outline-offset: -1px; }
+.eingabe.gross { min-height: 120px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+.eingabe.code {
+  text-transform: uppercase; letter-spacing: .22em; text-align: center;
+  font-size: 1.5rem; font-weight: 700;
+}
+
+.schritte { padding-left: 1.3em; margin: 6px 0; }
+.schritte li { margin: 7px 0; font-size: .9rem; }
+.schritte code {
+  background: var(--bg-2); padding: 1px 5px; border-radius: 5px; font-size: .85em;
+}
+
+.regelblock {
+  background: var(--bg-2); border: 1px solid var(--rand); border-radius: 10px;
+  padding: 10px; margin: 0; font-size: 11px; line-height: 1.45;
+  max-height: 200px; overflow: auto; -webkit-overflow-scrolling: touch;
+  white-space: pre; cursor: pointer;
+}
+
+.linkfeld {
+  background: var(--bg-2); border: 1px solid var(--rand); border-radius: 10px;
+  padding: 9px 11px; margin: 8px 0 0; font-size: .72rem; color: var(--text-leise);
+  word-break: break-all; line-height: 1.4;
+}
+
+.team-tag.ich { color: var(--akzent); font-weight: 700; }
+.team-tag.wartet { color: #7c879e; font-style: italic; }
+.hinweis.warte { text-align: center; padding: 12px 0; }
+
+.mini {
+  min-height: 32px; padding: 4px 10px; font-size: .78rem;
+  margin-left: auto; flex: none;
+}
+.liste li .mini { align-self: center; }
+
 @media (min-width: 620px) {
   .board { max-width: 520px; }
   .aktionen.fix { flex-direction: row; }

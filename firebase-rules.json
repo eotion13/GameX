@@ -1,0 +1,26 @@
+{
+  "rules": {
+    "raeume": {
+      "$code": {
+        "meta": {
+          ".read": "auth != null",
+          ".write": "auth != null && (!data.exists() || (newData.child('botSeed').val() === data.child('botSeed').val() && newData.child('playerCount').val() === data.child('playerCount').val()))"
+        },
+        "sitze": {
+          ".read": "auth != null",
+          "$sitz": {
+            ".write": "auth != null && (!data.child('uid').exists() || data.child('uid').val() === auth.uid || newData.child('bot').val() === true)"
+          }
+        },
+        "befehle": {
+          "$runde": {
+            ".read": "auth != null && data.child(auth.uid).exists()",
+            "$uid": {
+              ".write": "auth != null && $uid === auth.uid && !data.exists()"
+            }
+          }
+        }
+      }
+    }
+  }
+}

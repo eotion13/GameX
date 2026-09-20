@@ -6,6 +6,7 @@ Spieler geben ihre Befehle verdeckt und gleichzeitig; danach wertet eine feste
 Regel-Engine aus.
 
 **2–6 Spieler · einzeln oder in Teams · 15–30 Minuten · offline spielbar**
+**Auf einem Gerät reihum oder online mit Freunden**
 
 Die vollständigen Regeln: [RULES.md](RULES.md) – oder in der App unter „Regeln“.
 
@@ -44,18 +45,38 @@ statischen Dateien mit ES-Modulen.
   bis alle fertig sind.
 - **Teams:** bei gerader Spielerzahl. Partner sitzen sich gegenüber, ihre Quellen
   und Punkte zählen zusammen.
+- **Online, jeder auf seinem Handy:** *Online mit Freunden* → Raum eröffnen →
+  Link per WhatsApp verschicken. Wer darauf tippt, ist dabei. Bis zu 6 Geräte.
+  Einrichtung: [ONLINE.md](ONLINE.md).
 
 Der Spielstand wird automatisch gesichert – die App darf zwischendurch
 geschlossen werden.
 
+### Online kurz erklärt
+
+Die Datenbank speichert *keinen Spielstand*, sondern nur die Befehle jeder
+Runde. Weil `resolve` deterministisch ist, rechnet jedes Gerät aus denselben
+Befehlen denselben Spielstand aus. Daher braucht es keinen Gastgeber, der online
+bleiben muss, Geräte können nicht auseinanderlaufen, und eine Partie darf sich
+über Tage ziehen.
+
+Dass die Befehle bis zur eigenen Abgabe verdeckt bleiben, setzt der Server durch
+(siehe `firebase-rules.json`), nicht die App: Eine Runde ist erst lesbar, wenn
+der eigene Eintrag darin steht, und Abgegebenes lässt sich nicht mehr ändern.
+
+Gebraucht wird ein kostenloses Firebase-Projekt. Das richtet **eine** Person
+**einmal** ein; alle anderen tippen nur auf den Link, in dem die Zugangsdaten
+mitreisen.
+
 ## Entwicklung
 
 ```bash
-npm test                 # 60 Unit-Tests der Regel-Engine
-npm run sim              # Bot-gegen-Bot-Simulation (Balance)
-npm run serve            # lokaler Server
-node tools/smoke-test.js # Oberflächentest im echten Browser
-node tools/make-icons.py # App-Icons neu erzeugen
+npm test                  # 89 Unit-Tests (Regel-Engine und Online-Kern)
+npm run sim               # Bot-gegen-Bot-Simulation (Balance)
+npm run serve             # lokaler Server
+node tools/smoke-test.js  # Oberflächentest im echten Browser
+node tools/online-smoke.js # Online-Modus gegen eine nachgebaute Firebase
+node tools/make-icons.py  # App-Icons neu erzeugen
 ```
 
 ### Aufbau
@@ -67,9 +88,14 @@ src/engine/    Regeln – reines JavaScript, kein DOM, keine Zufallsquelle
   state.js       Zustandsdarstellung
   resolver.js    resolve(state, orders) -> neuer Zustand
   bots.js        Zufall / Greedy / Monte-Carlo
+src/net/       Online-Modus
+  room.js        Raumdaten -> Spielstand falten (rein, ohne Netz)
+  online.js      Sitzung: Raum anlegen, beitreten, abgleichen
+  firebase.js    REST-Zugriff auf Firebase (kein SDK, kein CDN)
+  config.js      Zugangsdaten aus Link, Speicher oder Datei
 src/ui/        Oberfläche (Vanilla JS, kein Framework)
 tests/         Unit-Tests (node --test)
-tools/         Simulation, Server, Oberflächentest, Icon-Erzeugung
+tools/         Simulation, Server, Oberflächentests, Icon-Erzeugung
 ```
 
 Der Kern ist eine reine Funktion:
@@ -134,8 +160,19 @@ dominiert.
   kein Typ kaputt ist – sie ersetzen kein Spieltest mit Menschen.
 - Der „schwer“-Bot rechnet pro Zug einige hundert Stellungen durch. Auf dem
   iPhone ist das spürbar, aber unter einer Sekunde.
-- Es gibt kein Online-Spiel über mehrere Geräte. Mehrspieler läuft über
-  Weiterreichen an einem Gerät.
+- Der Online-Modus braucht ein eigenes, kostenloses Firebase-Projekt. Es gibt
+  keinen Server, den man einfach benutzen kann – das ist der Preis dafür, dass
+  hier niemand Betriebskosten trägt.
+- Online ist gegen Mitspieler abgesichert, nicht gegen den Gastgeber: Wer das
+  Firebase-Projekt besitzt, kann in der Konsole alles mitlesen. Für eine Partie
+  unter Freunden ist das in Ordnung, für ein Turnier nicht.
+- Der Online-Modus wurde gegen eine nachgebaute Firebase getestet
+  (`tools/online-smoke.js`), die sich wie die REST-Schnittstelle verhält und die
+  Leseregel nachbildet. Gegen ein echtes Projekt ist er nicht automatisiert
+  geprüft – die Regeln in `firebase-rules.json` wertet nur der echte Server aus.
+- Aktualisierungen kommen per Abfrage alle 2,5 bis 6 Sekunden, nicht über eine
+  Dauerverbindung. Für ein rundenbasiertes Spiel reicht das; ein Echtzeitspiel
+  wäre so nicht zu bauen.
 
 ## Lizenz
 
