@@ -64,6 +64,32 @@ in der Basis und einem **Reiter** davor sowie 2 Energie.
 > Ein Angriff ins Blaue kostet die Einheit. Wer angreift, bringt besser
 > Unterstützung mit.
 
+## Häufige Fragen
+
+Jede Antwort hier ist in `tests/regelfragen.test.js` gegen die Engine abgesichert.
+
+**Bekomme ich nur Punkte, solange ich auf der Quelle stehe?**
+Nein. Einmal betreten, gehört die Quelle dir – und bringt jede Runde weiter
+1 Punkt und 1 Energie, auch wenn du längst weitergezogen bist. Sie geht erst
+verloren, wenn ein Gegner sie **betritt**; daneben stehen genügt ihm nicht.
+Eine Einheit kann also nacheinander mehrere Quellen einsammeln und alle behalten.
+
+**Was passiert, wenn ich vor einem Angreifer weglaufe?**
+Du entkommst unverletzt, sofern dein Zielfeld frei ist – der Angreifer läuft ins
+Leere und besetzt nur dein altes Feld. Wegrennen ist eine echte Verteidigung:
+Du verlierst das Feld, nicht die Einheit. Fliehst du dagegen auf ein Feld, auf
+dem ein Stärkerer steht, scheitert der Zug und die Einheit fällt.
+
+**Was passiert, wenn ich mehrere Einheiten auf dasselbe Feld schicke?**
+Nichts – sie blockieren sich gegenseitig, keine kommt an, keine nimmt Schaden.
+Ausnahme: Hat genau eine von ihnen Unterstützung, setzt diese sich durch.
+
+**Und wenn ich mit mehreren Einheiten eine gegnerische angreife?**
+Dasselbe: Der Verteidiger bleibt völlig unbehelligt stehen. Richtig ist
+**eine** Einheit mit *Bewegen* auf das Ziel, alle anderen mit *Unterstützen*
+auf das Feld **dieser** Einheit – nicht auf das Ziel. Dann zählt ihre Stärke
+zusammen und der Verteidiger fällt.
+
 ## Feinheiten
 
 - **Unterstützung wird geschnitten**, wenn ein Gegner auf das Feld des

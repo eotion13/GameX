@@ -218,9 +218,31 @@ button.aktiv { background: var(--spieler); border-color: var(--spieler); color: 
   background: var(--karte); border-left: 3px solid var(--akzent);
   padding: 10px 12px; border-radius: 0 10px 10px 0; font-size: .9rem;
 }
+.regeln h3 {
+  font-size: 1rem; color: var(--text); margin: 18px 0 4px; line-height: 1.35;
+}
 .regeln .typen { list-style: none; padding: 0; }
 .regeln .typen li { background: var(--karte); border-radius: 8px; padding: 8px 12px; }
 .regeln .aktionen { margin-top: 20px; }
+
+/* Symbol-Legende */
+.regeln .legende { list-style: none; padding: 0; margin: 8px 0; }
+.regeln .legende li {
+  display: grid; grid-template-columns: 76px 1fr; gap: 10px;
+  align-items: center; margin: 0;
+  padding: 9px 10px; border-radius: 10px; background: var(--karte);
+}
+.regeln .legende li + li { margin-top: 5px; }
+.legende-sym { display: flex; justify-content: center; align-items: center; }
+.legende-bild { display: block; overflow: visible; }
+.legende-zahl {
+  font-size: .95rem; font-weight: 700; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.legende-text { font-size: .86rem; line-height: 1.45; }
+.legende-text b { color: var(--text); }
+/* Stichwort auf eine eigene Zeile - sonst liest es sich als ein Satz. */
+.legende-text b:first-child { display: block; color: var(--akzent); }
 
 /* ----------------------------------------------------------------- Online */
 .fehler {

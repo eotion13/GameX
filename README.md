@@ -71,7 +71,7 @@ mitreisen.
 ## Entwicklung
 
 ```bash
-npm test                  # 89 Unit-Tests (Regel-Engine und Online-Kern)
+npm test                  # 99 Unit-Tests (Regel-Engine, Regelfragen, Online-Kern)
 npm run sim               # Bot-gegen-Bot-Simulation (Balance)
 npm run serve             # lokaler Server
 node tools/smoke-test.js  # Oberflächentest im echten Browser
