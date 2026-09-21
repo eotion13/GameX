@@ -139,3 +139,94 @@ test('zwei Gegner auf dasselbe leere Feld: der bessere Typ bekommt es, beide leb
   assert.ok(alive(r.state, b), 'der Unterlegene faellt nicht - es war kein Kampf');
   assert.equal(nodeOf(r.state, b), 'r1s1');
 });
+
+// --- "Was, wenn ein Gegner auf dasselbe Fluchtfeld zieht?" ----------------
+
+test('Wettrennen ums Fluchtfeld gewonnen: die Flucht gelingt', () => {
+  const s = emptyGame(2);
+  const ich = place(s, 0, 'reiter', 'r1s0');
+  const jaeger = place(s, 1, 'schild', 'r2s0');   // greift mein Feld an
+  const rivale = place(s, 1, 'bogen', 'r1s1');    // will auch nach k; Reiter schlaegt Bogen
+
+  const r = run(s, { [ich]: move('k'), [jaeger]: move('r1s0'), [rivale]: move('k') });
+  assert.equal(nodeOf(r.state, ich), 'k', 'ich gewinne das Rennen');
+  assert.ok(alive(r.state, rivale), 'der Rivale prallt nur ab');
+  assert.equal(nodeOf(r.state, rivale), 'r1s1');
+});
+
+test('Wettrennen unentschieden: ich bleibe stehen und muss kaempfen', () => {
+  const s = emptyGame(2);
+  const ich = place(s, 0, 'reiter', 'r1s0');
+  const jaeger = place(s, 1, 'schild', 'r2s0');   // Schild schlaegt Reiter
+  const rivale = place(s, 1, 'reiter', 'r1s1');   // gleicher Typ wie ich -> Patt um k
+
+  const r = run(s, { [ich]: move('k'), [jaeger]: move('r1s0'), [rivale]: move('k') });
+  assert.equal(alive(r.state, ich), false, 'die Flucht scheitert, der Kampf findet statt');
+  assert.equal(nodeOf(r.state, jaeger), 'r1s0');
+});
+
+// --- "Ist Unterstuetzen auch beim Verteidigen sinnvoll?" ------------------
+
+test('ein unterstuetzter Verteidiger schlaegt den Typvorteil des Angreifers', () => {
+  const s = emptyGame(2);
+  const verteidiger = place(s, 0, 'reiter', 'r1s0');
+  const helfer = place(s, 0, 'bogen', 'k');        // Nachbar von r1s0
+  const angreifer = place(s, 1, 'schild', 'r2s0'); // Schild schlaegt Reiter
+
+  const r = run(s, {
+    [verteidiger]: hold(), [helfer]: support('r1s0'), [angreifer]: move('r1s0'),
+  });
+  assert.ok(alive(r.state, verteidiger), 'Staerke 2 gegen 1 gewinnt');
+  assert.equal(alive(r.state, angreifer), false, 'der Angreifer faellt');
+});
+
+test('ohne den Helfer stirbt derselbe Verteidiger', () => {
+  const s = emptyGame(2);
+  const verteidiger = place(s, 0, 'reiter', 'r1s0');
+  const angreifer = place(s, 1, 'schild', 'r2s0');
+
+  const r = run(s, { [verteidiger]: hold(), [angreifer]: move('r1s0') });
+  assert.equal(alive(r.state, verteidiger), false);
+});
+
+test('wird der Helfer angegriffen, faellt seine Hilfe weg', () => {
+  const s = emptyGame(2);
+  const verteidiger = place(s, 0, 'reiter', 'r1s0');
+  const helfer = place(s, 0, 'bogen', 'k');
+  const angreifer = place(s, 1, 'schild', 'r2s0');
+  const stoerer = place(s, 1, 'reiter', 'r1s3');   // Nachbar von k
+
+  const r = run(s, {
+    [verteidiger]: hold(), [helfer]: support('r1s0'),
+    [angreifer]: move('r1s0'), [stoerer]: move('k'),
+  });
+  assert.ok(r.events.some((e) => e.type === 'supportCut'), 'die Hilfe wird geschnitten');
+  assert.equal(alive(r.state, verteidiger), false, 'und der Verteidiger steht allein da');
+});
+
+// --- "Gilt das Blockieren auch fuer zwei?" -------------------------------
+
+test('auch zwei eigene Figuren mit verschiedenen Typen blockieren sich', () => {
+  const s = emptyGame(2);
+  const a = place(s, 0, 'reiter', 'r1s0');
+  const b = place(s, 0, 'bogen', 'r1s1'); // Reiter schlaegt Bogen - unter Eigenen egal
+
+  const r = run(s, { [a]: move('k'), [b]: move('k') });
+  assert.equal(nodeOf(r.state, a), 'r1s0');
+  assert.equal(nodeOf(r.state, b), 'r1s1');
+  assert.equal(Object.values(r.state.units).filter((u) => u.node === 'k').length, 0);
+});
+
+// --- "Nimmt der Gegner meine verlassene Quelle einfach?" ------------------
+
+test('eine verlassene Quelle kann der Gegner kampflos uebernehmen', () => {
+  const s = emptyGame(2);
+  const ich = place(s, 0, 'reiter', 'r1s0');
+  let st = run(s, { [ich]: hold() }).state;
+  assert.equal(st.control['r1s0'], 0);
+
+  const gegner = place(st, 1, 'bogen', 'r2s0');
+  st = run(st, { [ich]: move('k'), [gegner]: move('r1s0') }).state;
+  assert.equal(st.control['r1s0'], 1, 'weggehen heisst: die Quelle steht offen');
+  assert.ok(alive(st, ich), 'gekaempft wurde dabei nicht');
+});

@@ -182,6 +182,21 @@ try {
   meldung(await cdp.js(`!!document.querySelector('.board') || !!document.querySelector('.rangliste')`), 'Mehrere Runden laufen stabil');
   await schuss('9-spaeter');
 
+  // --- Besitz ist auf dem Brett zu sehen -----------------------------------
+  // Der Ring traegt die Spielerfarbe als Attribut. Kaeme sie aus dem
+  // Stylesheet, wuerde eine CSS-Regel sie stillschweigend ueberschreiben -
+  // genau das war lange der Fall und niemandem aufgefallen.
+  const ringe = await cdp.js(`(() => {
+    const farben = ['rgb(228, 87, 46)','rgb(46, 134, 171)','rgb(63, 163, 77)',
+                    'rgb(217, 164, 4)','rgb(142, 94, 162)','rgb(0, 166, 166)'];
+    const r = [...document.querySelectorAll('.kontrollring')];
+    return { anzahl: r.length,
+             farbig: r.filter((c) => farben.includes(getComputedStyle(c).stroke)).length };
+  })()`);
+  meldung(ringe.anzahl > 0, `Besitzringe werden gezeichnet (${ringe.anzahl})`);
+  meldung(ringe.anzahl > 0 && ringe.farbig === ringe.anzahl,
+    `Besitzringe tragen wirklich die Spielerfarbe (${ringe.farbig}/${ringe.anzahl})`);
+
   // --- Speicherung ---------------------------------------------------------
   meldung(await cdp.js(`!!localStorage.getItem('knotenpunkt.spielstand.v2')`), 'Spielstand wird gesichert');
 

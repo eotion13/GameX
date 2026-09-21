@@ -74,15 +74,35 @@ Nein. Einmal betreten, gehört die Quelle dir – und bringt jede Runde weiter
 verloren, wenn ein Gegner sie **betritt**; daneben stehen genügt ihm nicht.
 Eine Einheit kann also nacheinander mehrere Quellen einsammeln und alle behalten.
 
+**Aber wenn ich weggehe, nimmt der Gegner die Quelle doch einfach?**
+Ja – das ist die zentrale Klemme des Spiels. Eine unbesetzte Quelle wechselt
+kampflos den Besitzer, sobald ein Gegner sie betritt. Ausbreiten bringt
+schnellen Zuwachs, lässt aber alles hinter dir offen. Genau deshalb muss die
+Mehrheit **zwei Runden** gehalten werden: Einmal drüberlaufen genügt nicht.
+
 **Was passiert, wenn ich vor einem Angreifer weglaufe?**
-Du entkommst unverletzt, sofern dein Zielfeld frei ist – der Angreifer läuft ins
-Leere und besetzt nur dein altes Feld. Wegrennen ist eine echte Verteidigung:
-Du verlierst das Feld, nicht die Einheit. Fliehst du dagegen auf ein Feld, auf
-dem ein Stärkerer steht, scheitert der Zug und die Einheit fällt.
+Drei Fälle:
+- **Zielfeld frei** → du entkommst unverletzt, der Angreifer bekommt nur dein
+  altes, leeres Feld. Es wird gar nicht gekämpft.
+- **Dort steht ein Stärkerer** → der Zug scheitert, die Einheit fällt.
+- **Ein Gegner zieht im selben Zug auf dasselbe Feld** → Wettrennen. Gewinnst
+  du es, bist du raus; verlierst du es oder steht es unentschieden, bleibst du
+  stehen und der Kampf auf deinem Feld findet ganz normal statt.
+
+Wegrennen ist also eine echte Verteidigung, aber keine Garantie.
+
+**Ist Unterstützen auch beim Verteidigen sinnvoll?**
+Ja. Ein gehaltener, unterstützter Verteidiger hat Stärke 2 und schlägt einen
+einzelnen Angreifer, **auch wenn dessen Typ ihn schlägt**. Aber: Wird der
+Helfer selbst angegriffen, fällt seine Unterstützung weg – auch wenn dieser
+Angriff scheitert.
 
 **Was passiert, wenn ich mehrere Einheiten auf dasselbe Feld schicke?**
 Nichts – sie blockieren sich gegenseitig, keine kommt an, keine nimmt Schaden.
-Ausnahme: Hat genau eine von ihnen Unterstützung, setzt diese sich durch.
+Das gilt schon bei zweien, und unterschiedliche Typen ändern daran nichts:
+unter Verbündeten entscheidet der Typ nicht. Ausnahme: Hat genau eine von ihnen
+Unterstützung, setzt diese sich durch. Bei **Gegnern** ist es anders – dort
+bekommt der Stärkere das Feld, der andere prallt unverletzt ab.
 
 **Und wenn ich mit mehreren Einheiten eine gegnerische angreife?**
 Dasselbe: Der Verteidiger bleibt völlig unbehelligt stehen. Richtig ist

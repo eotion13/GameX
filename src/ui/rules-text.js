@@ -9,11 +9,14 @@ const BLAU = '#2e86ab';
 const GOLD = '#ffd166';
 
 /** Kleines Feld-Symbol fuer die Legende. */
-function knoten({ x = 12, farbe = null, buchstabe = null, eigen = false, quelle = false }) {
+function knoten({ x = 12, farbe = null, buchstabe = null, eigen = false, quelle = false, ring = null }) {
   const teile = [];
   if (quelle) teile.push(`<circle cx="${x}" cy="12" r="10" fill="${GOLD}" opacity=".18"/>`);
   teile.push(`<circle cx="${x}" cy="12" r="7.5" fill="#222b3f"
-    stroke="${farbe && !buchstabe ? farbe : '#3d4a66'}" stroke-width="${farbe && !buchstabe ? 2 : 1.2}"/>`);
+    stroke="#3d4a66" stroke-width="1.2"/>`);
+  if (ring) {
+    teile.push(`<circle cx="${x}" cy="12" r="10" fill="none" stroke="${ring}" stroke-width="1.9"/>`);
+  }
   if (quelle) teile.push(`<path d="M ${x} 9 L ${x + 3} 12 L ${x} 15 L ${x - 3} 12 Z" fill="${GOLD}"/>`);
   if (buchstabe) {
     teile.push(`<circle cx="${x}" cy="12" r="6.5" fill="${farbe}"
@@ -59,8 +62,10 @@ function legendeBrett() {
     ${zeile(svg(24, `<rect x="1.5" y="1.5" width="21" height="21" rx="2" fill="none"
       stroke="${BLAU}" stroke-width="1.4" opacity=".6"/>${knoten({})}`), 'Basis',
     'Hier entstehen die neuen Figuren dieses Spielers.')}
-    ${zeile(svg(24, knoten({ quelle: true, farbe: ROT })), 'Farbiger Ring',
-    'Diese Quelle <i>gehört</i> gerade diesem Spieler — auch wenn niemand darauf steht.')}
+    ${zeile(svg(28, knoten({ x: 14, quelle: true, ring: ROT })), 'Farbiger Ring',
+    'Diese Quelle <i>gehört</i> gerade diesem Spieler — auch wenn niemand darauf '
+    + 'steht. Der Ring bleibt sichtbar, selbst wenn eine Figur darauf steht: '
+    + 'Ring und Figur können verschiedene Farben haben.')}
     ${zeile(pfeil, 'Durchgezogener Pfeil', 'Diese Figur geht dorthin.')}
     ${zeile(stuetze, 'Gestrichelte Linie', 'Diese Figur hilft dem Nachbarn. Sie bleibt stehen.')}
     ${zeile(svg(24, `${knoten({ farbe: ROT, buchstabe: 'R', eigen: true })}
@@ -156,22 +161,46 @@ export function rulesHtml() {
   <p class="merk">Deshalb lohnt es sich weiterzuziehen: Eine Figur kann nacheinander
   mehrere Quellen einsammeln und alle behalten.</p>
 
+  <h3>Aber wenn ich weggehe, nimmt der Gegner sie mir doch einfach?</h3>
+  <p><b>Ja — genau das ist die Klemme, um die das ganze Spiel gebaut ist.</b></p>
+  <p>Eine Quelle, auf der niemand steht, ist für jeden zum Hineinspazieren frei.
+  Es gibt also zwei Wege, und beide haben einen Preis:</p>
+  <ul>
+    <li><b>Stehenbleiben</b> — sicher, aber du kommst nie an mehr Quellen.</li>
+    <li><b>Weiterziehen</b> — du sammelst schneller, lässt aber hinter dir
+      alles offen.</li>
+  </ul>
+  <p>Die Mehrheit <i>zwei Runden lang halten</i> zu müssen ist genau deshalb die
+  Siegbedingung: Einmal kurz drüberlaufen genügt nicht. Am Ende musst du deine
+  Quellen tatsächlich verteidigen.</p>
+  <p class="merk">Praktischer Rat: Sammle mit den vorderen Figuren ein und
+  <b>baue rechtzeitig nach</b>. Neue Figuren kosten 2 Energie — und die Energie
+  kommt von genau den Quellen, die du gerade einsammelst.</p>
+
   <h3>Was passiert, wenn ich vor einem Angreifer weglaufe?</h3>
-  <p><b>Du entkommst unverletzt</b> — solange das Feld, auf das du fliehst,
-  frei ist. Der Angreifer läuft ins Leere und besetzt dein altes Feld, ohne dass
-  gekämpft wird.</p>
-  <p>Wegrennen ist also eine <b>echte Verteidigung</b>. Du verlierst das Feld,
-  aber nicht die Figur.</p>
-  <p><b>Aufpassen:</b> Fliehst du auf ein Feld, auf dem jemand Stärkeres steht,
-  kommst du dort nicht an — und stirbst.
-  Prüfe vorher, ob dein Fluchtweg wirklich frei ist.</p>
+  <p>Hängt davon ab, ob dein Fluchtfeld wirklich frei bleibt:</p>
+  <ul>
+    <li><b>Feld ist frei</b> → du entkommst unverletzt. Der Angreifer läuft ins
+      Leere und bekommt nur dein altes, leeres Feld. Es wird gar nicht gekämpft.</li>
+    <li><b>Dort steht jemand Stärkeres</b> → du kommst nicht an und stirbst.</li>
+    <li><b>Ein Gegner zieht im selben Zug auf dasselbe Fluchtfeld</b> → es wird
+      ein Wettrennen. Gewinnst du es, bist du raus. <b>Verlierst du es oder
+      steht es unentschieden, bleibst du stehen</b> — und der Kampf auf deinem
+      Feld findet ganz normal statt.</li>
+  </ul>
+  <p class="merk">Wegrennen ist eine echte Verteidigung, aber <b>keine
+  Garantie</b>. Am sichersten fliehst du dorthin, wo kein Gegner hinkommt.</p>
 
   <h3>Was passiert, wenn ich drei Figuren auf dasselbe Feld schicke?</h3>
   <p><b>Gar nichts — alle drei bleiben stehen.</b> Eigene Figuren drängeln sich
   gegenseitig weg. Keine kommt an, keine nimmt Schaden, die Runde ist verschenkt.</p>
-  <p>Das gilt auch für zwei. Schick immer nur <b>eine</b> Figur auf ein Feld.</p>
+  <p><b>Das gilt schon bei zwei.</b> Und verschiedene Typen helfen auch nicht:
+  Unter eigenen Figuren entscheidet der Typ nicht, sie blockieren sich einfach.
+  Schick immer nur <b>eine</b> Figur auf ein Feld.</p>
   <p><i>Ausnahme:</i> Hat eine der Figuren Unterstützung und die anderen nicht,
   setzt sich die unterstützte durch und die übrigen bleiben stehen.</p>
+  <p>Bei <b>Gegnern</b> ist es anders: Ziehen zwei Gegner auf dasselbe leere
+  Feld, bekommt es der Stärkere, der andere bleibt unverletzt stehen.</p>
 
   <h3>Und wenn ich mit drei Figuren eine gegnerische angreife?</h3>
   <p><b>Genau dasselbe: Der Gegner bleibt völlig unbehelligt stehen.</b> Deine
@@ -183,6 +212,20 @@ export function rulesHtml() {
   nicht auf den Gegner.</p>
   <p>Dann hat deine Angreiferin Stärke 3 gegen 1. Der Gegner fällt, dein Feld
   ist erobert, und du hast keine Figur verloren.</p>
+
+  <h3>Ist Unterstützen auch dann gut, wenn ich gar nicht angreife?</h3>
+  <p><b>Ja — beim Verteidigen wirkt es genauso.</b> Eine Figur, die gehalten
+  <i>und</i> von einem Nachbarn unterstützt wird, hat Stärke 2. Ein einzelner
+  Angreifer hat Stärke 1 und fällt, <b>selbst wenn sein Typ deinen schlägt</b>.</p>
+  <p>Ohne den Helfer wäre dieselbe Figur gestorben. Unterstützen ist damit
+  <b>die beste Art, eine wichtige Quelle zu halten</b>.</p>
+  <p><b>Aber nicht blind:</b></p>
+  <ul>
+    <li>Wird der <b>Helfer selbst angegriffen</b>, fällt seine Hilfe weg — auch
+      wenn dieser Angriff scheitert. Dann steht dein Verteidiger plötzlich allein.</li>
+    <li>Droht gerade gar nichts, ist Unterstützen ein verschenkter Zug. Dann
+      lieber eine neue Quelle holen.</li>
+  </ul>
 
   <h3>Wie werde ich eine Quelle wieder los, die der Gegner hält?</h3>
   <p>Du musst mit einer Figur <b>draufziehen</b>. Steht dort jemand, musst du

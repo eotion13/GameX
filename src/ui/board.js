@@ -59,10 +59,15 @@ export function boardSvg(o) {
       parts.push(`<rect x="${n.x - s}" y="${n.y - s}" width="${s * 2}" height="${s * 2}" rx="0.1"
         class="basisrahmen" stroke="${col}"/>`);
     }
-    const ctrlColor = controller !== null && controller !== undefined
-      ? state.players[controller].color : null;
-    parts.push(`<circle class="${cls.join(' ')}" cx="${n.x}" cy="${n.y}" r="${NODE_R}"
-      ${ctrlColor ? `stroke="${ctrlColor}"` : ''}/>`);
+    parts.push(`<circle class="${cls.join(' ')}" cx="${n.x}" cy="${n.y}" r="${NODE_R}"/>`);
+
+    // Besitzring ausserhalb des Feldes: bleibt sichtbar, auch wenn eine Einheit
+    // darauf steht. (Die Farbe darf nicht am Feld selbst haengen - eine
+    // CSS-Regel schlaegt in SVG das gleichnamige Praesentationsattribut.)
+    if (controller !== null && controller !== undefined) {
+      parts.push(`<circle class="kontrollring" cx="${n.x}" cy="${n.y}" r="${NODE_R + 0.1}"
+        stroke="${state.players[controller].color}"/>`);
+    }
     if (n.isSource) {
       parts.push(`<path class="quellsymbol" d="M ${n.x} ${n.y - 0.12} L ${n.x + 0.12} ${n.y} L ${n.x} ${n.y + 0.12} L ${n.x - 0.12} ${n.y} Z"/>`);
     }

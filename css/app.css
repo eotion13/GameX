@@ -147,6 +147,9 @@ button.aktiv { background: var(--spieler); border-color: var(--spieler); color: 
 .kante { stroke: #38435c; stroke-width: .035; }
 .knoten { fill: #222b3f; stroke: #3d4a66; stroke-width: .05; }
 .knoten.quelle { stroke: #7a6a3a; }
+/* Hier bewusst kein stroke: sonst wuerde es die Spielerfarbe aus dem
+   Attribut ueberschreiben - CSS schlaegt in SVG das Praesentationsattribut. */
+.kontrollring { fill: none; stroke-width: .075; opacity: .95; }
 .knoten.ziel { stroke: var(--akzent); stroke-width: .09; fill: #3a3a2a; }
 .basisrahmen { fill: none; stroke-width: .05; opacity: .55; }
 .quellsymbol { fill: #f0c75e; opacity: .85; }
