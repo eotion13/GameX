@@ -1,5 +1,5 @@
 // Offline-Cache. Bei jeder Aenderung VERSION erhoehen.
-const VERSION = 'knotenpunkt-v4';
+const VERSION = 'knotenpunkt-v5';
 const DATEIEN = [
   './', './index.html', './manifest.webmanifest',
   './css/app.css',

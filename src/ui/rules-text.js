@@ -153,11 +153,20 @@ export function rulesHtml() {
   <h2>Häufige Fragen</h2>
 
   <h3>Bekomme ich nur Punkte, solange ich auf der Quelle stehe?</h3>
-  <p><b>Nein.</b> Sobald du eine Quelle einmal betreten hast, gehört sie dir —
-  und sie bringt dir <b>jede Runde weiter Punkte und Energie</b>, auch wenn du
-  längst weitergezogen bist.</p>
-  <p>Sie geht erst verloren, wenn ein <b>Gegner sie betritt</b>. Ein Gegner, der
-  nur daneben steht, ändert gar nichts.</p>
+  <p><b>Nein.</b> Die Quelle gehört dir, sobald eine deiner Figuren
+  <b>am Ende einer Runde darauf steht</b>. Ab da bringt sie dir
+  <b>jede Runde weiter Punkte und Energie</b>, auch wenn du längst
+  weitergezogen bist.</p>
+  <p>Sie geht erst verloren, wenn ein <b>Gegner am Rundenende darauf steht</b>.
+  Ein Gegner, der nur daneben steht, ändert gar nichts.</p>
+  <p>Zwei Dinge, die daraus folgen und überraschen:</p>
+  <ul>
+    <li><b>Ankommen zählt, nicht Angreifen.</b> Greifst du eine besetzte Quelle
+      an und stirbst dabei, gehört sie weiter dem Gegner — du warst ja nie oben.</li>
+    <li><b>Die Quelle überlebt deine Figur.</b> Ziehst du weiter und stirbst
+      woanders, gehört die Quelle trotzdem weiter dir und zahlt weiter. Der
+      Besitz hängt am Feld, nicht an der Figur.</li>
+  </ul>
   <p class="merk">Deshalb lohnt es sich weiterzuziehen: Eine Figur kann nacheinander
   mehrere Quellen einsammeln und alle behalten.</p>
 

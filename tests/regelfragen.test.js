@@ -230,3 +230,41 @@ test('eine verlassene Quelle kann der Gegner kampflos uebernehmen', () => {
   assert.equal(st.control['r1s0'], 1, 'weggehen heisst: die Quelle steht offen');
   assert.ok(alive(st, ich), 'gekaempft wurde dabei nicht');
 });
+
+// --- "Reicht es, einmal draufgewesen zu sein?" ----------------------------
+// Genauer: es zaehlt, am Rundenende dort zu stehen.
+
+test('ein gescheiterter Angriff auf eine Quelle bringt keinen Besitz', () => {
+  const s = emptyGame(2);
+  const ich = place(s, 0, 'reiter', 'r2s0');
+  const wache = place(s, 1, 'schild', 'r1s0'); // Schild schlaegt Reiter
+  let st = run(s, { [wache]: hold(), [ich]: hold() }).state;
+  assert.equal(st.control['r1s0'], 1, 'die Wache haelt die Quelle');
+
+  st = run(st, { [ich]: move('r1s0'), [wache]: hold() }).state;
+  assert.equal(alive(st, ich), false, 'der Angriff scheitert');
+  assert.equal(st.control['r1s0'], 1, 'angreifen allein genuegt nicht - ankommen zaehlt');
+});
+
+test('die Quelle bleibt in Besitz, auch wenn die Figur danach faellt', () => {
+  const s = emptyGame(2);
+  const ich = place(s, 0, 'reiter', 'r1s0');
+  let st = run(s, { [ich]: hold() }).state;
+  assert.equal(st.control['r1s0'], 0);
+
+  const falle = place(st, 1, 'schild', 'k'); // Schild schlaegt Reiter
+  st = run(st, { [ich]: move('k'), [falle]: hold() }).state;
+  assert.equal(alive(st, ich), false, 'meine Figur stirbt woanders');
+  assert.equal(st.control['r1s0'], 0, 'der Besitz haengt am Feld, nicht an der Figur');
+  assert.equal(st.players[0].score, 2, 'die Quelle zahlt weiter');
+});
+
+test('ein gescheiterter Angreifer nimmt dem Verteidiger die Quelle nicht', () => {
+  const s = emptyGame(2);
+  const ich = place(s, 0, 'schild', 'r1s0'); // Schild schlaegt Reiter
+  const feind = place(s, 1, 'reiter', 'r2s0');
+  let st = run(s, { [ich]: hold(), [feind]: hold() }).state;
+  st = run(st, { [ich]: hold(), [feind]: move('r1s0') }).state;
+  assert.equal(alive(st, feind), false);
+  assert.equal(st.control['r1s0'], 0);
+});

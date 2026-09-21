@@ -69,10 +69,16 @@ in der Basis und einem **Reiter** davor sowie 2 Energie.
 Jede Antwort hier ist in `tests/regelfragen.test.js` gegen die Engine abgesichert.
 
 **Bekomme ich nur Punkte, solange ich auf der Quelle stehe?**
-Nein. Einmal betreten, gehört die Quelle dir – und bringt jede Runde weiter
-1 Punkt und 1 Energie, auch wenn du längst weitergezogen bist. Sie geht erst
-verloren, wenn ein Gegner sie **betritt**; daneben stehen genügt ihm nicht.
-Eine Einheit kann also nacheinander mehrere Quellen einsammeln und alle behalten.
+Nein. Die Quelle gehört dir, sobald eine deiner Einheiten **am Rundenende
+darauf steht** – ab da bringt sie jede Runde 1 Punkt und 1 Energie, auch wenn
+du längst weitergezogen bist. Sie geht erst verloren, wenn ein Gegner am
+Rundenende darauf steht; daneben stehen genügt ihm nicht. Eine Einheit kann
+also nacheinander mehrere Quellen einsammeln und alle behalten.
+
+Zwei Folgen davon: Ein **gescheiterter Angriff** bringt keinen Besitz – es
+zählt das Ankommen, nicht das Angreifen. Und der Besitz hängt **am Feld, nicht
+an der Einheit**: Zieht sie weiter und fällt woanders, bleibt die Quelle
+trotzdem deine und zahlt weiter.
 
 **Aber wenn ich weggehe, nimmt der Gegner die Quelle doch einfach?**
 Ja – das ist die zentrale Klemme des Spiels. Eine unbesetzte Quelle wechselt
