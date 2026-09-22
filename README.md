@@ -128,28 +128,50 @@ waren Zweierpartien nach 3–4 Runden vorbei. Jetzt zählt die Mehrheit erst, we
 sie eine weitere Runde überlebt. Das verlängert die Partie und macht aus dem
 Sieg eine Verteidigungsaufgabe.
 
-## Balance (1000 Partien je Aufstellung, gleichstarke Bots)
+## Balance (gleichstarke Bots)
 
 | Aufstellung | Siege je Startplatz | Erwartet | Größte Abweichung | Ø Runden |
 |---|---|---|---|---|
-| 2 Spieler | 48,1 % / 44,9 % (7,0 % unentschieden) | 50 % | 5,1 pp (≈1,0 σ) | 7,9 |
-| 3 Spieler | 32,6 % / 31,3 % / 33,8 % | 33,3 % | 2,0 pp (≈1,3 σ) | 14,2 |
-| 4 Spieler | 24,1 % / 23,4 % / 23,0 % / 26,1 % | 25 % | 2,0 pp (≈1,5 σ) | 15,0 |
+| 2 Spieler (1000) | 47,8 % / 46,7 % (5,5 % unentschieden) | 47,3 % | 0,6 pp (0,4 σ) | 7,8 |
+| 3 Spieler (1000) | 34,4 % / 32,5 % / 32,8 % | 33,2 % | 1,2 pp (0,8 σ) | 13,2 |
+| 4 Spieler (4000) | 25,3 % / 24,4 % / 25,6 % / 24,1 % | 24,9 % | 0,8 pp (1,1 σ) | 14,9 |
 
 Kein Startplatz ist messbar im Vorteil – alle Abweichungen liegen im
-statistischen Rauschen.
+statistischen Rauschen. Der Erwartungswert ist um die Unentschieden bereinigt.
 
 Dass **Strategie** und nicht Zufall entscheidet, zeigt der Vergleich der
-Bot-Stufen über je 200 Partien:
+Bot-Stufen:
 
 | Begegnung | Ergebnis |
 |---|---|
-| schwer vs. normal | 88,5 % : 11,5 % |
-| normal vs. leicht | 76,0 % : 24,0 % |
-| normal vs. zufall | 98,0 % : 2,0 % |
+| schwer vs. normal | 94,5 % : 5,5 % |
+| normal vs. leicht | 73,8 % : 26,3 % |
+| normal vs. zufall | 98,8 % : 1,3 % |
 
 Alle drei Einheitstypen werden regelmäßig gebaut und gewinnen Kämpfe; kein Typ
 dominiert.
+
+### Der Bot schätzte den Verteidiger doppelt so stark, wie er war
+
+Lange lieferte der `normal`-Bot 0,90 Kämpfe pro Partie – ein Gegner, der
+praktisch nie angriff. Die Ursache stand in einer Zeile: Er schätzte die
+Verteidigungsstärke eines Feldes als *1 + jeder benachbarte Verbündete*.
+
+Gemessen an 188.156 echten Stellungen schätzte er damit **2,53**, während die
+tatsächliche Stärke bei **1,17** lag – eine Überschätzung um 117 %. In
+Wirklichkeit steht ein Verteidiger in **83,6 %** der Fälle völlig allein, denn
+Unterstützung ist ein Befehl, den ein Nachbar auch erteilen muss. Der Bot ließ
+dadurch 99,3 % aller Angriffsgelegenheiten aus.
+
+Die Korrektur zählt nur Verbündete, die **nicht selbst angegriffen werden
+können** – eine bedrohte Unterstützung wird ohnehin geschnitten. Von fünf
+geprüften Formeln war diese mit Abstand die genaueste (mittlerer Fehler 0,095
+statt 1,367). Im direkten Duell über 8.675 entschiedene Partien gewinnt die
+reparierte Fassung **67,4 %** (32,5 σ), bei 4 und 6 Spielern sogar 74 %.
+
+Für das Spielgefühl ist das der größte Unterschied: **4,58 Kämpfe je Partie
+statt 0,90**, und bei zwei Spielern enden jetzt **85 %** der Partien durch
+Eroberung statt durch Punkteauszählen.
 
 ### Ehrliche Einschränkungen
 
