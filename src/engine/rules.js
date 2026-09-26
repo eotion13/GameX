@@ -25,6 +25,27 @@ export const CONFIG = {
   holdRoundsToWin: 2,  // Mehrheit muss so viele Runden in Folge gehalten werden
 };
 
+/**
+ * Wie viele Runden in Folge die Mehrheit gehalten werden muss.
+ *
+ * Zu zweit eine Runde mehr als sonst. Der Grund steckt im Kraefteverhaeltnis:
+ * Wer die Mehrheit erreicht, hat im Duell etwa gleich viele Figuren wie sein
+ * Gegner (gemessen 3,42 zu 3,15). Um eine Quelle zurueckzuholen, muss der
+ * Gegner also einen Kampf bei Gleichstand gewinnen - das gelingt nur in 14 %
+ * der Anlaeufe, die Partie ist nach 5,2 Runden vorbei. Ab drei Gegnern steht
+ * der Fuehrende 1:1,5 bzw. 1:1,9 und kann nicht mehr alles decken; dort
+ * scheitern schon 40 % bzw. 50 % der Anlaeufe, eine Runde genuegt.
+ *
+ * Mit einer zweiten Verteidigungsrunde steigt die Quote im Duell auf 29 %,
+ * die Partie dauert 6,7 statt 5,2 Runden - und es bleibt bei 100 % Siegen
+ * durch Eroberung. Ab drei Spielern waere dieselbe Aenderung schaedlich:
+ * bei vier Spielern faellt der Anteil der Eroberungssiege von 50 % auf
+ * 31 %, der Rest endet am Rundenlimit mit Punktezaehlen.
+ */
+export function holdRoundsNeeded(playerCount) {
+  return playerCount === 2 ? 3 : 2;
+}
+
 /** Mehrheit der Quellen, die sofort gewinnt. */
 export function majorityNeeded(sourceCount) {
   return Math.floor(sourceCount / 2) + 1;

@@ -71,7 +71,7 @@ mitreisen.
 ## Entwicklung
 
 ```bash
-npm test                  # 109 Unit-Tests (Regel-Engine, Regelfragen, Online-Kern)
+npm test                  # 111 Unit-Tests (Regel-Engine, Regelfragen, Online-Kern)
 npm run sim               # Bot-gegen-Bot-Simulation (Balance)
 npm run serve             # lokaler Server
 node tools/smoke-test.js  # Oberflächentest im echten Browser
@@ -123,16 +123,16 @@ unentschieden, kein einziger Kampf in 300 Partien. Seit ein verlorener Kampf die
 Einheit kostet, sind Angriffe eine echte Entscheidung und Unterstützung wird zur
 zentralen Ressource.
 
-**3. Die Mehrheit muss gehalten werden.** Mit sofortigem Sieg bei 4 von 7 Quellen
-waren Zweierpartien nach 3–4 Runden vorbei. Jetzt zählt die Mehrheit erst, wenn
-sie eine weitere Runde überlebt. Das verlängert die Partie und macht aus dem
-Sieg eine Verteidigungsaufgabe.
+**3. Die Mehrheit muss gehalten werden – im Duell eine Runde länger.** Mit
+sofortigem Sieg bei 4 von 7 Quellen waren Zweierpartien nach 3–4 Runden vorbei.
+Jetzt zählt die Mehrheit erst, wenn sie überlebt: **zu zweit drei Runden in
+Folge, ab drei Spielern zwei**. Warum unterschiedlich, steht unten.
 
 ## Balance (gleichstarke Bots)
 
 | Aufstellung | Siege je Startplatz | Erwartet | Größte Abweichung | Ø Runden |
 |---|---|---|---|---|
-| 2 Spieler (1000) | 47,8 % / 46,7 % (5,5 % unentschieden) | 47,3 % | 0,6 pp (0,4 σ) | 7,8 |
+| 2 Spieler (1000) | 47,6 % / 46,9 % (5,5 % unentschieden) | 47,3 % | 0,4 pp (0,2 σ) | 8,7 |
 | 3 Spieler (1000) | 34,4 % / 32,5 % / 32,8 % | 33,2 % | 1,2 pp (0,8 σ) | 13,2 |
 | 4 Spieler (4000) | 25,3 % / 24,4 % / 25,6 % / 24,1 % | 24,9 % | 0,8 pp (1,1 σ) | 14,9 |
 
@@ -172,6 +172,44 @@ reparierte Fassung **67,4 %** (32,5 σ), bei 4 und 6 Spielern sogar 74 %.
 Für das Spielgefühl ist das der größte Unterschied: **4,58 Kämpfe je Partie
 statt 0,90**, und bei zwei Spielern enden jetzt **85 %** der Partien durch
 Eroberung statt durch Punkteauszählen.
+
+### Warum das Duell eine Runde mehr braucht
+
+Die Regel „die Mehrheit muss überleben" schafft ein Fenster: Wer sie erreicht,
+muss eine Runde lang aushalten, und die anderen brauchen genau **eine** Quelle,
+um ihn zu stoppen. Gemessen wurde, wie oft das gelingt – mit dem starken Bot auf
+allen Plätzen, je 200–500 Partien:
+
+| Spieler | Anläufer : alle Gegner zusammen | Anlauf gebrochen | Ø Runden |
+|---|---|---|---|
+| 2 | 3,42 : 3,15 (1,0×) | **14,2 %** | 5,2 |
+| 3 | 3,62 : 5,29 (1,5×) | 39,9 % | 8,5 |
+| 4 | 3,94 : 7,50 (1,9×) | 50,2 % | 12,8 |
+
+Die Bruchquote folgt dem Kräfteverhältnis, nicht der Erreichbarkeit – angreifbar
+sind überall ähnlich viele Quellen (2,96 / 3,25 / 3,90). Im Duell steht der
+Anläufer bei Gleichstand, sein einziger Gegner müsste einen fairen Kampf
+gewinnen. Ab drei Gegnern kann der Führende nicht mehr alles decken.
+
+Eine zweite Verteidigungsrunde repariert genau das – und nur dort:
+
+| Spieler | hold | Ø Runden | gebrochen | Ende durch Mehrheit | nach Punkten |
+|---|---|---|---|---|---|
+| 2 | 2 | 5,2 | 14,2 % | 100 % | 0 % |
+| **2** | **3** | **6,7** | **29,3 %** | **100 %** | **0 %** |
+| 4 | 2 | 12,8 | 50,2 % | 49,5 % | 50,5 % |
+| 4 | 3 | 13,9 | 62,3 % | 30,5 % | **69,5 %** |
+
+Zu zweit verdoppelt sich die Chance, einen Sieganlauf zu brechen, die Partie
+wird anderthalb Runden länger, und es bleibt bei **100 %** Eroberungssiegen. Bei
+vier Spielern richtet dieselbe Änderung Schaden an: Die Eroberungssiege fallen
+von 49,5 % auf 30,5 %, der Rest endet am Rundenlimit mit Punktezählen. Deshalb
+hängt `holdRoundsToWin` an der Spielerzahl.
+
+Wer einen Anlauf bricht, gewinnt danach meistens auch: zu zweit in 78 % der
+Fälle, bei drei Spielern ist die Partie wieder offen (je ~33 %). Bei vier
+Spielern bleibt der Gebremste dagegen Favorit (58,9 %) – dort ist das Fenster
+eine Bremse, keine Wende.
 
 ### Ehrliche Einschränkungen
 

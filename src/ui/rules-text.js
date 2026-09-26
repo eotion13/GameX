@@ -12,17 +12,24 @@ const GOLD = '#ffd166';
 function knoten({ x = 12, farbe = null, buchstabe = null, eigen = false, quelle = false, ring = null }) {
   const teile = [];
   if (quelle) teile.push(`<circle cx="${x}" cy="12" r="10" fill="${GOLD}" opacity=".18"/>`);
+  if (ring) teile.push(`<circle cx="${x}" cy="12" r="10" fill="${ring}" opacity=".55"/>`);
   teile.push(`<circle cx="${x}" cy="12" r="7.5" fill="#222b3f"
     stroke="#3d4a66" stroke-width="1.2"/>`);
   if (ring) {
     teile.push(`<circle cx="${x}" cy="12" r="10" fill="none" stroke="${ring}" stroke-width="1.9"/>`);
   }
-  if (quelle) teile.push(`<path d="M ${x} 9 L ${x + 3} 12 L ${x} 15 L ${x - 3} 12 Z" fill="${GOLD}"/>`);
   if (buchstabe) {
     teile.push(`<circle cx="${x}" cy="12" r="6.5" fill="${farbe}"
       stroke="${eigen ? '#fff' : '#0d111b'}" stroke-width="${eigen ? 1.6 : 1.2}"/>`);
     teile.push(`<text x="${x}" y="12" fill="#fff" font-size="8" font-weight="700"
       text-anchor="middle" dominant-baseline="central">${buchstabe}</text>`);
+  }
+  // Steht eine Figur auf der Quelle, rueckt der Rhombus an den Rand - genau
+  // wie auf dem Brett, sonst waere er unter der Figur verschwunden.
+  if (quelle) {
+    const [qx, qy, r] = buchstabe ? [x - 5.5, 6.5, 2.2] : [x, 12, 3];
+    teile.push(`<path d="M ${qx} ${qy - r} L ${qx + r} ${qy} L ${qx} ${qy + r} L ${qx - r} ${qy} Z"
+      fill="${GOLD}" stroke="#0d111b" stroke-width="${buchstabe ? 1 : 0}" paint-order="stroke"/>`);
   }
   return teile.join('');
 }
@@ -62,10 +69,15 @@ function legendeBrett() {
     ${zeile(svg(24, `<rect x="1.5" y="1.5" width="21" height="21" rx="2" fill="none"
       stroke="${BLAU}" stroke-width="1.4" opacity=".6"/>${knoten({})}`), 'Basis',
     'Hier entstehen die neuen Figuren dieses Spielers.')}
-    ${zeile(svg(28, knoten({ x: 14, quelle: true, ring: ROT })), 'Farbiger Ring',
-    'Diese Quelle <i>gehört</i> gerade diesem Spieler — auch wenn niemand darauf '
-    + 'steht. Der Ring bleibt sichtbar, selbst wenn eine Figur darauf steht: '
-    + 'Ring und Figur können verschiedene Farben haben.')}
+    ${zeile(svg(28, knoten({ x: 14, quelle: true, ring: ROT })), 'Farbiger Hof um eine Quelle',
+    'Diese Quelle <i>gehört</i> gerade diesem Spieler — auch wenn niemand mehr '
+    + 'darauf steht. Einmal betreten heißt: sie bleibt deine, bis ein anderer sie '
+    + 'betritt.')}
+    ${zeile(svg(28, knoten({ x: 14, quelle: true, ring: ROT, farbe: ROT, buchstabe: 'R', eigen: true })),
+    'Derselbe Hof mit Figur darauf',
+    'So sieht eine Quelle aus, die du gerade erobert hast. Der kleine goldene '
+    + 'Rhombus rutscht dabei nach oben links — daran erkennst du, dass unter der '
+    + 'Figur eine Quelle liegt.')}
     ${zeile(pfeil, 'Durchgezogener Pfeil', 'Diese Figur geht dorthin.')}
     ${zeile(stuetze, 'Gestrichelte Linie', 'Diese Figur hilft dem Nachbarn. Sie bleibt stehen.')}
     ${zeile(svg(24, `${knoten({ farbe: ROT, buchstabe: 'R', eigen: true })}
@@ -81,7 +93,8 @@ function legendeKopf() {
   return `<ul class="legende">
     ${zeile(chip('◆ 3'), '3 Quellen', 'gehören dir. <b>Das ist die wichtigste Zahl im Spiel.</b>')}
     ${zeile(chip('◆ 4¹'), 'Die kleine hochgestellte Zahl',
-    'zeigt, seit wie vielen Runden du die Mehrheit hältst. Bei <b>²</b> hast du gewonnen.')}
+    'zeigt, seit wie vielen Runden du die Mehrheit hältst. Wie weit du zählen musst, '
+    + 'steht rechts daneben: <b>2 Runden halten</b> — zu zweit sind es <b>3</b>.')}
     ${zeile(chip('⬤ 2'), '2 Figuren', 'hast du noch auf dem Brett.')}
     ${zeile(chip('★ 5'), '5 Punkte', 'hast du gesammelt. Die zählen nur, wenn nach 15 Runden niemand gewonnen hat.')}
     ${zeile(chip('⚡ 4'), '4 Energie', 'hast du übrig. Eine neue Figur kostet 2.')}
@@ -96,11 +109,16 @@ export function rulesHtml() {
 
   <h2>Das Ziel</h2>
   <p class="merk">Auf dem Brett liegen <b>goldene Felder</b> — die Quellen.
-  Wer <b>mehr als die Hälfte</b> davon besitzt und sie <b>zwei Runden lang
+  Wer <b>mehr als die Hälfte</b> davon besitzt und sie <b>mehrere Runden lang
   hält</b>, gewinnt sofort.</p>
   <p>Wie viele du genau brauchst, steht immer oben am Bildschirmrand:
-  <b>Sieg: 4/7 ◆</b> heißt „du brauchst 4 der 7 Quellen“. Je mehr Spieler
-  mitspielen, desto größer wird das Brett.</p>
+  <b>Sieg: 4/7 ◆ · 2 Runden halten</b> heißt „du brauchst 4 der 7 Quellen,
+  und zwar zwei Runden hintereinander“. Je mehr Spieler mitspielen, desto
+  größer wird das Brett.</p>
+  <p><b>Zu zweit sind es drei Runden statt zwei.</b> Im Duell hat dein Gegner
+  sonst fast keine Chance: Er steht allein gegen dich und ungefähr gleich
+  stark da, müsste dir also eine Quelle im fairen Kampf abnehmen. Ab drei
+  Spielern greifen mehrere gleichzeitig an, da genügt eine Runde weniger.</p>
   <p>Schafft es niemand, gewinnt nach 15 Runden, wer die meisten Punkte hat.</p>
 
   <h2>So läuft eine Runde</h2>
@@ -179,9 +197,9 @@ export function rulesHtml() {
     <li><b>Weiterziehen</b> — du sammelst schneller, lässt aber hinter dir
       alles offen.</li>
   </ul>
-  <p>Die Mehrheit <i>zwei Runden lang halten</i> zu müssen ist genau deshalb die
-  Siegbedingung: Einmal kurz drüberlaufen genügt nicht. Am Ende musst du deine
-  Quellen tatsächlich verteidigen.</p>
+  <p>Die Mehrheit <i>mehrere Runden lang halten</i> zu müssen ist genau deshalb
+  die Siegbedingung: Einmal kurz drüberlaufen genügt nicht. Am Ende musst du
+  deine Quellen tatsächlich verteidigen.</p>
   <p class="merk">Praktischer Rat: Sammle mit den vorderen Figuren ein und
   <b>baue rechtzeitig nach</b>. Neue Figuren kosten 2 Energie — und die Energie
   kommt von genau den Quellen, die du gerade einsammelst.</p>

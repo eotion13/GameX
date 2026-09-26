@@ -173,6 +173,44 @@ try {
   await klick('[data-action="weiter"]');
   meldung(await cdp.js(`document.body.innerText.includes('Runde') && !!document.querySelector('.board')`), 'Runde 2 beginnt');
 
+  // --- Besitz ist auf dem Brett zu sehen -----------------------------------
+  // Die Farbe traegt das Attribut. Kaeme sie aus dem Stylesheet, wuerde eine
+  // CSS-Regel sie stillschweigend ueberschreiben - genau das war lange der
+  // Fall und niemandem aufgefallen.
+  //
+  // Zweiter Punkt, der lange falsch war: Erobert wird durch Hinziehen, also
+  // steht im Normalfall eine Figur auf der Quelle. Ein Merkmal, das die Figur
+  // verdeckt, markiert genau dann nichts. Deshalb wird hier geprueft, dass
+  // die Besitzflaeche breiter ist als die Figur und dass jede Quelle ihren
+  // Rhombus behaelt.
+  const besitz = await cdp.js(`(() => {
+    const farben = ['rgb(228, 87, 46)','rgb(46, 134, 171)','rgb(63, 163, 77)',
+                    'rgb(217, 164, 4)','rgb(142, 94, 162)','rgb(0, 166, 166)'];
+    const ring = [...document.querySelectorAll('.kontrollring')];
+    const flaeche = [...document.querySelectorAll('.besitzflaeche')];
+    const einheit = document.querySelector('.einheit');
+    const zahl = (el, a) => el ? parseFloat(el.getAttribute(a)) : 0;
+    return {
+      ringe: ring.length,
+      ringFarbig: ring.filter((c) => farben.includes(getComputedStyle(c).stroke)).length,
+      flaechen: flaeche.length,
+      flaecheFarbig: flaeche.filter((c) => farben.includes(getComputedStyle(c).fill)).length,
+      sichtbar: flaeche.every((c) => parseFloat(getComputedStyle(c).opacity) > 0.2),
+      breiterAlsFigur: zahl(flaeche[0], 'r') > zahl(einheit, 'r'),
+      symbole: document.querySelectorAll('.quellsymbol').length,
+    };
+  })()`);
+  meldung(besitz.ringe > 0, `Besitz wird markiert (${besitz.ringe} Quellen)`);
+  meldung(besitz.ringe > 0 && besitz.ringFarbig === besitz.ringe,
+    `Besitzringe tragen wirklich die Spielerfarbe (${besitz.ringFarbig}/${besitz.ringe})`);
+  meldung(besitz.flaechen === besitz.ringe && besitz.flaecheFarbig === besitz.flaechen
+    && besitz.sichtbar, `Besitzflaeche ist farbig und sichtbar (${besitz.flaecheFarbig}/${besitz.flaechen})`);
+  meldung(besitz.breiterAlsFigur,
+    'Besitzflaeche reicht ueber die Figur hinaus - auf einer besetzten Quelle sichtbar');
+  meldung(besitz.symbole === 7,
+    `Jede Quelle behaelt ihren Rhombus, auch mit Figur darauf (${besitz.symbole}/7)`);
+
+
   // --- Mehrere Runden am Stueck --------------------------------------------
   for (let r = 0; r < 6; r++) {
     if (await cdp.js(`!!document.querySelector('[data-action="befehle-fertig"]')`)) await klick('[data-action="befehle-fertig"]');
@@ -181,21 +219,6 @@ try {
   }
   meldung(await cdp.js(`!!document.querySelector('.board') || !!document.querySelector('.rangliste')`), 'Mehrere Runden laufen stabil');
   await schuss('9-spaeter');
-
-  // --- Besitz ist auf dem Brett zu sehen -----------------------------------
-  // Der Ring traegt die Spielerfarbe als Attribut. Kaeme sie aus dem
-  // Stylesheet, wuerde eine CSS-Regel sie stillschweigend ueberschreiben -
-  // genau das war lange der Fall und niemandem aufgefallen.
-  const ringe = await cdp.js(`(() => {
-    const farben = ['rgb(228, 87, 46)','rgb(46, 134, 171)','rgb(63, 163, 77)',
-                    'rgb(217, 164, 4)','rgb(142, 94, 162)','rgb(0, 166, 166)'];
-    const r = [...document.querySelectorAll('.kontrollring')];
-    return { anzahl: r.length,
-             farbig: r.filter((c) => farben.includes(getComputedStyle(c).stroke)).length };
-  })()`);
-  meldung(ringe.anzahl > 0, `Besitzringe werden gezeichnet (${ringe.anzahl})`);
-  meldung(ringe.anzahl > 0 && ringe.farbig === ringe.anzahl,
-    `Besitzringe tragen wirklich die Spielerfarbe (${ringe.farbig}/${ringe.anzahl})`);
 
   // --- Speicherung ---------------------------------------------------------
   meldung(await cdp.js(`!!localStorage.getItem('knotenpunkt.spielstand.v2')`), 'Spielstand wird gesichert');

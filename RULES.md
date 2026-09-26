@@ -7,8 +7,9 @@ gleichzeitig, deshalb gibt es keinen Startspielervorteil.
 
 ## Ziel
 
-Kontrolliere die **Mehrheit der Quellen** und halte sie **zwei Runden in Folge**.
-Sonst gewinnt nach 15 Runden, wer die meisten Punkte gesammelt hat.
+Kontrolliere die **Mehrheit der Quellen** und halte sie: **zu zweit drei Runden
+in Folge, ab drei Spielern zwei**. Sonst gewinnt nach 15 Runden, wer die meisten
+Punkte gesammelt hat.
 
 ## Das Feld
 
@@ -84,7 +85,7 @@ trotzdem deine und zahlt weiter.
 Ja – das ist die zentrale Klemme des Spiels. Eine unbesetzte Quelle wechselt
 kampflos den Besitzer, sobald ein Gegner sie betritt. Ausbreiten bringt
 schnellen Zuwachs, lässt aber alles hinter dir offen. Genau deshalb muss die
-Mehrheit **zwei Runden** gehalten werden: Einmal drüberlaufen genügt nicht.
+Mehrheit mehrere Runden gehalten werden: Einmal drüberlaufen genügt nicht.
 
 **Was passiert, wenn ich vor einem Angreifer weglaufe?**
 Drei Fälle:
@@ -136,7 +137,12 @@ zusammen und der Verteidiger fällt.
 
 ## Sieg
 
-- **Mehrheit** der Quellen zwei Runden in Folge → sofortiger Sieg.
+- **Mehrheit** der Quellen mehrere Runden in Folge → sofortiger Sieg.
+  Zu zweit **drei** Runden, ab drei Spielern **zwei**. Im Duell hat der
+  Gegner sonst kaum eine Chance zurückzuschlagen: Er steht dem Anläufer
+  allein und etwa gleich stark gegenüber und müsste einen Kampf bei
+  Gleichstand gewinnen. Ab drei Gegnern kann der Führende ohnehin nicht
+  alles decken. Die Anzeige oben nennt die für eure Runde gültige Zahl.
 - **Nach 15 Runden** gewinnt die höchste Punktzahl.
   Gleichstand: mehr Einheiten, dann mehr Quellen.
 - Im **Team** zählen Quellen und Punkte der Partner zusammen.

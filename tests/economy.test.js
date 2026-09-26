@@ -85,8 +85,9 @@ test('Energie steigt ab Runde 11 auf 2 pro Quelle', () => {
   assert.equal(r.state.players[0].energy, before + 2);
 });
 
-test('Mehrheit muss zwei Runden gehalten werden', () => {
+test('Zu zweit muss die Mehrheit drei Runden gehalten werden', () => {
   const s = emptyGame(2);
+  assert.equal(s.config.holdRoundsToWin, 3);
   const need = majority(s); // 4 von 7
   const ids = [];
   for (let i = 0; i < need; i++) ids.push(place(s, 0, 'reiter', `r1s${i}`));
@@ -99,9 +100,39 @@ test('Mehrheit muss zwei Runden gehalten werden', () => {
   assert.equal(first.state.majorityStreak[0], 1);
 
   const second = run(first.state, orders);
+  assert.equal(second.state.phase, 'orders', 'zwei Runden reichen im Duell nicht');
+  assert.equal(second.state.majorityStreak[0], 2);
+
+  const third = run(second.state, orders);
+  assert.equal(third.state.phase, 'finished');
+  assert.equal(third.state.winner.reason, 'mehrheit');
+  assert.deepEqual(third.state.winner.teams, [0]);
+});
+
+test('Ab drei Spielern genuegen zwei Runden', () => {
+  const s = emptyGame(3);
+  assert.equal(s.config.holdRoundsToWin, 2);
+  const need = majority(s);
+  const ids = [];
+  for (let i = 0; i < need; i++) ids.push(place(s, 0, 'reiter', `r1s${i}`));
+  const rival = place(s, 1, 'schild', s.board.bases[1]);
+  const other = place(s, 2, 'schild', s.board.bases[2]);
+  const orders = Object.fromEntries([...ids, rival, other].map((id) => [id, hold()]));
+
+  const first = run(s, orders);
+  assert.equal(first.state.phase, 'orders');
+  const second = run(first.state, orders);
   assert.equal(second.state.phase, 'finished');
   assert.equal(second.state.winner.reason, 'mehrheit');
-  assert.deepEqual(second.state.winner.teams, [0]);
+});
+
+test('Die Haltedauer haengt an der Spielerzahl, ist aber ueberschreibbar', () => {
+  assert.equal(emptyGame(2).config.holdRoundsToWin, 3);
+  for (const n of [3, 4, 5, 6]) {
+    assert.equal(emptyGame(n).config.holdRoundsToWin, 2, `${n} Spieler`);
+  }
+  const eigen = emptyGame(2, { config: { holdRoundsToWin: 2 } });
+  assert.equal(eigen.config.holdRoundsToWin, 2, 'ausdrueckliche Angabe schlaegt die Vorgabe');
 });
 
 test('Verlorene Mehrheit setzt die Serie zurueck', () => {

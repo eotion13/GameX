@@ -4,6 +4,7 @@ import { TYPE_INFO } from '../engine/rules.js';
 import { occupancy } from '../engine/state.js';
 
 const NODE_R = 0.3;
+const BESITZ_R = NODE_R + 0.13;   // Aussenkante der Besitzflaeche
 const HIT_R = 0.46;
 
 /**
@@ -53,6 +54,14 @@ export function boardSvg(o) {
     if (n.isSource) {
       parts.push(`<circle cx="${n.x}" cy="${n.y}" r="${NODE_R + 0.15}" fill="url(#quellglanz)"/>`);
     }
+    // Besitz als farbige Flaeche rund um das Feld. Ein duenner Ring allein
+    // reicht nicht: Erobert wird durch Hinziehen, also steht im Normalfall
+    // eine Figur darauf - und die hat dieselbe Farbe. Der Ring sah dann aus
+    // wie ihr Rand, der Besitz war praktisch unsichtbar.
+    if (controller !== null && controller !== undefined) {
+      const bcol = state.players[controller].color;
+      parts.push(`<circle class="besitzflaeche" cx="${n.x}" cy="${n.y}" r="${BESITZ_R}" fill="${bcol}"/>`);
+    }
     if (n.base !== null) {
       const col = state.players[n.base].color;
       const s = NODE_R + 0.26;
@@ -61,15 +70,12 @@ export function boardSvg(o) {
     }
     parts.push(`<circle class="${cls.join(' ')}" cx="${n.x}" cy="${n.y}" r="${NODE_R}"/>`);
 
-    // Besitzring ausserhalb des Feldes: bleibt sichtbar, auch wenn eine Einheit
-    // darauf steht. (Die Farbe darf nicht am Feld selbst haengen - eine
-    // CSS-Regel schlaegt in SVG das gleichnamige Praesentationsattribut.)
+    // Kraeftiger Rand um die Besitzflaeche. (Die Farbe muss am Attribut
+    // haengen, nicht im Stylesheet - eine CSS-Regel schlaegt in SVG das
+    // gleichnamige Praesentationsattribut.)
     if (controller !== null && controller !== undefined) {
-      parts.push(`<circle class="kontrollring" cx="${n.x}" cy="${n.y}" r="${NODE_R + 0.1}"
+      parts.push(`<circle class="kontrollring" cx="${n.x}" cy="${n.y}" r="${BESITZ_R}"
         stroke="${state.players[controller].color}"/>`);
-    }
-    if (n.isSource) {
-      parts.push(`<path class="quellsymbol" d="M ${n.x} ${n.y - 0.12} L ${n.x + 0.12} ${n.y} L ${n.x} ${n.y + 0.12} L ${n.x - 0.12} ${n.y} Z"/>`);
     }
   }
 
@@ -116,6 +122,20 @@ export function boardSvg(o) {
     if (o.ordered && o.ordered.has(u.id)) {
       parts.push(`<circle class="befehlspunkt" cx="${n.x + 0.2}" cy="${n.y - 0.2}" r="0.07"/>`);
     }
+  }
+
+  // Quellsymbol zuletzt. Steht eine Figur auf der Quelle, rueckt der Rhombus
+  // an den Rand - sonst deckt die Figur ihn zu und man sieht dem Feld nicht
+  // mehr an, dass es ueberhaupt eine Quelle ist.
+  for (const id of board.order) {
+    const n = board.nodes[id];
+    if (!n.isSource) continue;
+    const besetzt = !!occ[id];
+    const cx = besetzt ? n.x - 0.22 : n.x;
+    const cy = besetzt ? n.y - 0.22 : n.y;
+    const r = besetzt ? 0.085 : 0.12;
+    parts.push(`<path class="quellsymbol${besetzt ? ' klein' : ''}"
+      d="M ${cx} ${cy - r} L ${cx + r} ${cy} L ${cx} ${cy + r} L ${cx - r} ${cy} Z"/>`);
   }
 
   // Unsichtbare, grosse Trefferflaechen (Finger statt Mauszeiger)

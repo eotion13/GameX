@@ -1,6 +1,6 @@
 // Spielzustand: reine Daten, vollstaendig serialisierbar, kein Zufall.
 
-import { CONFIG, PLAYER_COLORS, PLAYER_NAMES, majorityNeeded } from './rules.js';
+import { CONFIG, PLAYER_COLORS, PLAYER_NAMES, majorityNeeded, holdRoundsNeeded } from './rules.js';
 import { createBoard, startNodes } from './board.js';
 
 export const STATE_VERSION = 1;
@@ -13,7 +13,13 @@ export const STATE_VERSION = 1;
  */
 export function createGame(opts = {}) {
   const playerCount = opts.playerCount ?? 3;
-  const config = { ...CONFIG, ...(opts.config || {}) };
+  // Wie lange die Mehrheit gehalten werden muss, haengt von der Spielerzahl
+  // ab (siehe holdRoundsNeeded). Eine ausdrueckliche Angabe schlaegt das.
+  const config = {
+    ...CONFIG,
+    holdRoundsToWin: holdRoundsNeeded(playerCount),
+    ...(opts.config || {}),
+  };
   const board = createBoard(playerCount, config);
   const teams = opts.teams && opts.teams.length === playerCount
     ? opts.teams.slice()
