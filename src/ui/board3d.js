@@ -1,33 +1,17 @@
 // Three.js-Brettansicht. Reine Praesentation - keine Regel-Logik.
 // Aktivierung: ?view=3d  oder  localStorage knotenpunkt.view=3d
+// Wird dynamisch geladen (app.js), damit 2D/CI Three.js nicht ziehen.
 
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { OrbitControls } from '../../vendor/three/OrbitControls.js';
 import { TYPE_INFO } from '../engine/rules.js';
 import { occupancy } from '../engine/state.js';
 import { createFigureMesh } from './figures.js';
+import { isView3d, setView3d } from './view-flag.js';
 
-const VIEW_KEY = 'knotenpunkt.view';
+export { isView3d, setView3d };
+
 const NODE_R = 0.32;
-
-/** Feature-Flag: 3D-View statt SVG. */
-export function isView3d() {
-  try {
-    const q = new URLSearchParams(location.search).get('view');
-    if (q === '3d' || q === 'three') return true;
-    if (q === '2d' || q === 'svg') return false;
-    return localStorage.getItem(VIEW_KEY) === '3d';
-  } catch (_) {
-    return false;
-  }
-}
-
-export function setView3d(on) {
-  try {
-    if (on) localStorage.setItem(VIEW_KEY, '3d');
-    else localStorage.removeItem(VIEW_KEY);
-  } catch (_) { /* privater Modus */ }
-}
 
 function hexColor(hex) {
   return new THREE.Color(hex || '#888888');

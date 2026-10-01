@@ -5,10 +5,7 @@ import { resolve } from '../engine/resolver.js';
 import { botOrders, mulberry32 } from '../engine/bots.js';
 import { TYPES, TYPE_INFO, PLAYER_NAMES } from '../engine/rules.js';
 import { boardSvg } from './board.js';
-import {
-  isView3d, setView3d, detachBoard3d, mountBoard3d, disposeBoard3d,
-  applyBoard3dReveal, getBoard3d,
-} from './board3d.js';
+import { isView3d, setView3d } from './view-flag.js';
 import { createReveal, PHASE } from './reveal.js';
 import { describeEvent, nodeName, winnerText } from './text.js';
 import { rulesHtml } from './rules-text.js';
@@ -33,6 +30,33 @@ let pendingBoard3d = null;
 let activeReveal = null;
 let revealKey = null;
 let lastRevealFrame = null;
+
+/** Lazy Three.js-Modul (nur bei 3D geladen). */
+let board3dMod = null;
+let board3dLoading = null;
+
+function loadBoard3d() {
+  if (board3dMod) return Promise.resolve(board3dMod);
+  if (!board3dLoading) {
+    board3dLoading = import('./board3d.js').then((m) => {
+      board3dMod = m;
+      return m;
+    }).catch((err) => {
+      board3dLoading = null;
+      console.warn('3D-Modul nicht ladbar:', err);
+      return null;
+    });
+  }
+  return board3dLoading;
+}
+
+function detachBoard3dIfLoaded() {
+  board3dMod?.detachBoard3d?.();
+}
+
+function disposeBoard3dIfLoaded() {
+  board3dMod?.disposeBoard3d?.();
+}
 
 /**
  * Brett-Inhalt: SVG-Markup oder 3D-Host. Aufrufer umschliesst mit .brett.
@@ -298,7 +322,7 @@ function revealActionsHtml() {
       <button class="neben" data-action="reveal-skip">Überspringen</button>`;
   }
   return `
-    <button class="haupt" data-action="${online ? 'online-ergebnis' : 'reveal-weiter'}">
+    <button class="haupt" data-action="${online ? 'online-ergebnis' : 'auswerten'}">
       ${online ? 'Ergebnis' : 'Weiter zur Auswertung'}
     </button>`;
 }
@@ -317,7 +341,9 @@ function maybeStartReveal() {
     : `off-${payload.before.round}-${payload.events?.length || 0}`;
 
   if (activeReveal && revealKey === key) {
-    if (lastRevealFrame) applyBoard3dReveal(lastRevealFrame);
+    if (lastRevealFrame && board3dMod?.getBoard3d?.()) {
+      board3dMod.applyBoard3dReveal(lastRevealFrame);
+    }
     return;
   }
 
@@ -327,7 +353,7 @@ function maybeStartReveal() {
   activeReveal = createReveal(payload, {
     onUpdate(frame) {
       lastRevealFrame = frame;
-      if (getBoard3d()) applyBoard3dReveal(frame);
+      if (board3dMod?.getBoard3d?.()) board3dMod.applyBoard3dReveal(frame);
       const prevPhase = app.revealUi?.phase;
       const prevStatus = app.revealUi?.status;
       app.revealUi = { status: activeReveal?.status || frame.status, phase: frame.phase };
@@ -632,14 +658,14 @@ const actions = {
     const url = new URL(location.href);
     url.searchParams.set('view', '3d');
     history.replaceState(null, '', url);
-    render();
+    loadBoard3d().finally(() => render());
   },
   'view-2d': () => {
     setView3d(false);
     const url = new URL(location.href);
     url.searchParams.delete('view');
     history.replaceState(null, '', url);
-    disposeBoard3d();
+    disposeBoard3dIfLoaded();
     render();
   },
 
@@ -756,7 +782,7 @@ function render() {
   const f = app.onlineForm;
   pendingBoard3d = null;
   // WebGL-Canvas vor dem DOM-Wipe sichern
-  detachBoard3d();
+  detachBoard3dIfLoaded();
   const html = {
     menu: viewMenu,
     pass: viewPass,
@@ -789,11 +815,13 @@ function render() {
         viewerId: app.online.sitz, showOrdersOf: app.online.sitz,
       }),
       wartetSeit: app.wartenSeit ? Date.now() - app.wartenSeit : 0,
+      view3d: isView3d(),
     }),
     'online-bot': () => viewOnlineBot({
       sitzung: app.online,
       statusHtml: statusBar(app.game, app.online.sitz),
       brettHtml: brettContent({ state: app.game, orders: {}, viewerId: app.online.sitz, showOrdersOf: null }),
+      view3d: isView3d(),
     }),
     'online-reveal': () => {
       const v = verlaufEintrag(app.ansicht.runde);
@@ -806,22 +834,34 @@ function render() {
   }[app.screen];
   root.innerHTML = html ? html() : viewMenu();
   root.scrollTop = 0;
+
+  const needReveal = app.screen === 'reveal' || app.screen === 'online-reveal';
+
   if (pendingBoard3d) {
     const host = root.querySelector('[data-board3d]');
-    const mounted = mountBoard3d(host, pendingBoard3d, handleNodeTap);
-    if (!mounted && host) {
-      // WebGL fehlt: SVG-Fallback im selben Slot, Reveal-Chrome bleibt nutzbar
-      host.innerHTML = boardSvg(pendingBoard3d);
-      host.removeAttribute('data-board3d');
-      host.classList.remove('brett-3d-host');
-    }
+    const opts = pendingBoard3d;
+    if (!needReveal && activeReveal) stopReveal();
+    loadBoard3d().then((mod) => {
+      if (!host?.isConnected) return;
+      if (!mod) {
+        host.innerHTML = boardSvg(opts);
+        host.removeAttribute('data-board3d');
+        host.classList.remove('brett-3d-host');
+        if (needReveal) maybeStartReveal();
+        return;
+      }
+      const mounted = mod.mountBoard3d(host, opts, handleNodeTap);
+      if (!mounted && host.isConnected) {
+        host.innerHTML = boardSvg(opts);
+        host.removeAttribute('data-board3d');
+        host.classList.remove('brett-3d-host');
+      }
+      if (needReveal) maybeStartReveal();
+    });
   } else {
-    disposeBoard3d();
-  }
-  if (app.screen === 'reveal' || app.screen === 'online-reveal') {
-    maybeStartReveal();
-  } else if (activeReveal) {
-    stopReveal();
+    disposeBoard3dIfLoaded();
+    if (needReveal) maybeStartReveal();
+    else if (activeReveal) stopReveal();
   }
 }
 
@@ -1111,6 +1151,7 @@ function starteApp() {
 }
 
 starteApp();
+if (isView3d()) loadBoard3d(); // Prefetch, damit die erste 3D-Runde schneller startet
 
 // Tippt jemand auf einen Einladungslink, waehrend die App schon offen ist,
 // aendert sich nur der Anker - die Seite wird nicht neu geladen.

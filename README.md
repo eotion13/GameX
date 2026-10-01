@@ -95,17 +95,19 @@ src/net/       Online-Modus
   config.js      Zugangsdaten aus Link, Speicher oder Datei
 src/ui/        Oberfläche (Vanilla JS, kein Framework)
   board.js       2D-SVG-Brett
-  board3d.js     optionale 3D-Ansicht (Three.js, Feature-Flag ?view=3d)
+  board3d.js     optionale 3D-Ansicht (Three.js, lazy bei ?view=3d)
   figures.js     typunterscheidbare Figuren-Meshes (Reiter/Bogen/Schild)
   reveal.js      gleichzeitige Aufdeckung (pausierbar/skipbar, zustandslos)
+  view-flag.js   Feature-Flag ohne Three.js-Import
 vendor/three/  gepinnte Three.js r170 (MIT)
 tests/         Unit-Tests (node --test)
 tools/         Simulation, Server, Oberflächentests, Icon-Erzeugung
 ```
 
 Die 3D-Ansicht ist reine Präsentation über derselben Engine: Menü **Ansicht → 3D**,
-oder URL `?view=3d`. Ohne Flag bleibt das SVG-Brett. Nach dem Zugbefehl startet in 3D
-die Aufdeckungs-Sequenz (Pause/Überspringen); Timing ändert keinen Spielstand.
+oder URL `?view=3d`. Ohne Flag bleibt das SVG-Brett (Three.js wird dann nicht geladen).
+Nach dem Zugbefehl startet in 3D die Aufdeckungs-Sequenz (Pause/Überspringen);
+Timing ändert keinen Spielstand. Online nutzt dieselbe View inkl. Warten-Overlay.
 
 Der Kern ist eine reine Funktion:
 

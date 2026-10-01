@@ -1,10 +1,10 @@
 // Offline-Cache. Bei jeder Aenderung VERSION erhoehen.
-const VERSION = 'knotenpunkt-v8';
+const VERSION = 'knotenpunkt-v9';
 const DATEIEN = [
   './', './index.html', './manifest.webmanifest',
   './css/app.css',
   './src/ui/app.js', './src/ui/board.js', './src/ui/board3d.js', './src/ui/figures.js',
-  './src/ui/reveal.js', './src/ui/text.js', './src/ui/rules-text.js',
+  './src/ui/reveal.js', './src/ui/view-flag.js', './src/ui/text.js', './src/ui/rules-text.js',
   './src/ui/online-views.js',
   './src/engine/rules.js', './src/engine/board.js', './src/engine/state.js',
   './src/engine/resolver.js', './src/engine/bots.js',
