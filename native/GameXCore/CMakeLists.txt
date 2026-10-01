@@ -18,4 +18,8 @@ target_include_directories(GameXCore PUBLIC
 enable_testing()
 add_executable(gamex_core_tests tests/core_tests.cpp)
 target_link_libraries(gamex_core_tests PRIVATE GameXCore)
+target_include_directories(gamex_core_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
+target_compile_definitions(gamex_core_tests PRIVATE
+  GAMEX_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+)
 add_test(NAME gamex_core_tests COMMAND gamex_core_tests)
