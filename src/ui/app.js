@@ -231,7 +231,7 @@ function revealPayload() {
 
 function stopReveal() {
   if (activeReveal) {
-    try { activeReveal.skip(); } catch (_) { /* bereits done */ }
+    try { activeReveal.cancel(); } catch (_) { /* ok */ }
   }
   activeReveal = null;
   revealKey = null;

@@ -18,9 +18,9 @@ export const PHASE = {
 
 /** Feste Dauern in ms - bewusst gleich fuer alle Spieler/Farben. */
 export const DEFAULT_DURATIONS = Object.freeze({
-  orders: 400,
-  moves: 700,
-  effects: 500,
+  orders: 600,
+  moves: 800,
+  effects: 600,
 });
 
 /**
@@ -324,6 +324,8 @@ export function createReveal(payload, opts = {}) {
     status = 'playing';
     startedAt = now() - pausedElapsed;
     promise = new Promise((r) => { resolvePromise = r; });
+    // Sofort erster Frame (Pfeile sichtbar), nicht erst nach einem RAF
+    emit(pausedElapsed);
     rafId = raf(tick);
     return promise;
   }
@@ -345,8 +347,20 @@ export function createReveal(payload, opts = {}) {
 
   /** Springt zum Endframe; Zustand after setzt der Aufrufer. */
   function skip() {
+    if (status === 'done') {
+      emit(totalDuration(durations));
+      return;
+    }
     pausedElapsed = totalDuration(durations);
     end();
+  }
+
+  /** Stoppen ohne End-Callback (Bildschirmwechsel). */
+  function cancel() {
+    if (rafId) { caf(rafId); rafId = 0; }
+    status = 'done';
+    resolvePromise = null;
+    promise = null;
   }
 
   return {
@@ -356,6 +370,7 @@ export function createReveal(payload, opts = {}) {
     pause,
     resume,
     skip,
+    cancel,
     get status() { return status; },
     /** Sofortigen Frame erzeugen (Tests / Sync). */
     frameAt(elapsedMs) {

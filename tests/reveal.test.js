@@ -24,9 +24,9 @@ describe('reveal Plan und Fairness', () => {
     assert.ok(plan.moves.length >= 1);
     const ids = plan.moves.map((m) => m.unitId);
     assert.deepEqual(ids, [...ids].sort());
-    // gleiche Dauer-Konstante fuer alle (keine spielerabhaengigen Werte)
-    assert.equal(DEFAULT_DURATIONS.moves, 700);
-    assert.equal(DEFAULT_DURATIONS.orders, 400);
+    assert.ok(DEFAULT_DURATIONS.orders > 0);
+    assert.ok(DEFAULT_DURATIONS.moves > 0);
+    assert.ok(DEFAULT_DURATIONS.effects > 0);
     void after;
   });
 
@@ -50,10 +50,10 @@ describe('reveal Plan und Fairness', () => {
 
   it('phaseAt: feste Phasengrenzen unabhaengig von Farbe/Sitz', () => {
     assert.equal(phaseAt(0).phase, PHASE.ORDERS);
-    assert.equal(phaseAt(399).phase, PHASE.ORDERS);
-    assert.equal(phaseAt(400).phase, PHASE.MOVES);
-    assert.equal(phaseAt(400 + 699).phase, PHASE.MOVES);
-    assert.equal(phaseAt(400 + 700).phase, PHASE.EFFECTS);
+    assert.equal(phaseAt(DEFAULT_DURATIONS.orders - 1).phase, PHASE.ORDERS);
+    assert.equal(phaseAt(DEFAULT_DURATIONS.orders).phase, PHASE.MOVES);
+    assert.equal(phaseAt(DEFAULT_DURATIONS.orders + DEFAULT_DURATIONS.moves - 1).phase, PHASE.MOVES);
+    assert.equal(phaseAt(DEFAULT_DURATIONS.orders + DEFAULT_DURATIONS.moves).phase, PHASE.EFFECTS);
     assert.equal(phaseAt(totalDuration()).phase, PHASE.DONE);
   });
 
