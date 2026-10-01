@@ -1,0 +1,17 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.5",
+  "Category": "Games",
+  "Description": "Knotenpunkt / GameX — 3D presentation over frozen GameXCore rules",
+  "Modules": [
+    {
+      "Name": "GameX",
+      "Type": "Runtime",
+      "LoadingPhase": "Default",
+      "AdditionalDependencies": [
+        "Engine",
+        "UMG"
+      ]
+    }
+  ]
+}
