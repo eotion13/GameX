@@ -58,12 +58,18 @@ export class Board3DView {
     this.canvas.className = 'board3d-canvas';
     this.canvas.setAttribute('aria-label', 'Spielfeld 3D');
 
-    this.renderer = new THREE.WebGLRenderer({
-      canvas: this.canvas,
-      antialias: true,
-      alpha: true,
-      powerPreference: 'low-power',
-    });
+    try {
+      this.renderer = new THREE.WebGLRenderer({
+        canvas: this.canvas,
+        antialias: true,
+        alpha: true,
+        powerPreference: 'low-power',
+      });
+    } catch (err) {
+      const e = new Error('WebGL nicht verfügbar');
+      e.cause = err;
+      throw e;
+    }
     this.renderer.setClearColor(0x0f1420, 0);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
@@ -570,9 +576,16 @@ export function mountBoard3d(host, options, onNodeTap) {
     }
     return null;
   }
-  if (!instance) instance = new Board3DView();
-  instance.attach(host, options, onNodeTap);
-  return instance;
+  try {
+    if (!instance) instance = new Board3DView();
+    instance.attach(host, options, onNodeTap);
+    return instance;
+  } catch (err) {
+    console.warn('3D-Brett nicht verfügbar:', err);
+    try { instance?.dispose(); } catch (_) { /* ok */ }
+    instance = null;
+    return null;
+  }
 }
 
 export function disposeBoard3d() {

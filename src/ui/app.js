@@ -7,7 +7,7 @@ import { TYPES, TYPE_INFO, PLAYER_NAMES } from '../engine/rules.js';
 import { boardSvg } from './board.js';
 import {
   isView3d, setView3d, detachBoard3d, mountBoard3d, disposeBoard3d,
-  applyBoard3dReveal,
+  applyBoard3dReveal, getBoard3d,
 } from './board3d.js';
 import { createReveal, PHASE } from './reveal.js';
 import { describeEvent, nodeName, winnerText } from './text.js';
@@ -327,13 +327,14 @@ function maybeStartReveal() {
   activeReveal = createReveal(payload, {
     onUpdate(frame) {
       lastRevealFrame = frame;
-      applyBoard3dReveal(frame);
+      if (getBoard3d()) applyBoard3dReveal(frame);
       const prevPhase = app.revealUi?.phase;
       const prevStatus = app.revealUi?.status;
       app.revealUi = { status: activeReveal?.status || frame.status, phase: frame.phase };
       if (frame.phase !== prevPhase || frame.status !== prevStatus) updateRevealChrome();
     },
   });
+  // Sofort Playing-Chrome, auch bevor der erste RAF kommt
   updateRevealChrome();
   activeReveal.start().then(() => {
     if (revealKey !== key) return;
@@ -807,7 +808,13 @@ function render() {
   root.scrollTop = 0;
   if (pendingBoard3d) {
     const host = root.querySelector('[data-board3d]');
-    mountBoard3d(host, pendingBoard3d, handleNodeTap);
+    const mounted = mountBoard3d(host, pendingBoard3d, handleNodeTap);
+    if (!mounted && host) {
+      // WebGL fehlt: SVG-Fallback im selben Slot, Reveal-Chrome bleibt nutzbar
+      host.innerHTML = boardSvg(pendingBoard3d);
+      host.removeAttribute('data-board3d');
+      host.classList.remove('brett-3d-host');
+    }
   } else {
     disposeBoard3d();
   }
