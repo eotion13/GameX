@@ -143,6 +143,50 @@ button.aktiv { background: var(--spieler); border-color: var(--spieler); color: 
 
 .brett { display: flex; justify-content: center; }
 .board { width: 100%; max-width: min(92vw, 460px); height: auto; display: block; touch-action: manipulation; }
+.brett-3d, .brett-3d-host { width: 100%; max-width: min(92vw, 460px); }
+.brett-3d-host { position: relative; }
+.board3d-canvas {
+  width: 100%;
+  display: block;
+  border-radius: 12px;
+  touch-action: none;
+  background: radial-gradient(ellipse at 50% 30%, #1a2236 0%, #0f1420 70%);
+}
+
+.brett-wrap { position: relative; display: flex; justify-content: center; }
+.brett-wrap-3d { width: 100%; }
+.brett-wrap-3d .brett { width: 100%; max-width: min(92vw, 460px); margin: 0 auto; }
+.warten-overlay {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  width: min(92%, 280px);
+  pointer-events: none;
+  z-index: 2;
+}
+.warten-overlay-inner {
+  background: rgba(15, 20, 32, 0.82);
+  border: 1px solid var(--rand);
+  border-radius: 12px;
+  padding: 10px 12px;
+  backdrop-filter: blur(6px);
+}
+.warten-overlay-inner strong { display: block; margin-bottom: 4px; }
+.warten-overlay-sub { margin: 0 0 6px; color: var(--text-leise); font-size: .9rem; }
+.warten-overlay-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.warten-overlay-liste li { display: flex; align-items: center; gap: 8px; font-size: .95rem; }
+.warten-overlay-liste .leer { color: var(--akzent); }
+.warten-overlay-hint { margin: 8px 0 0; color: var(--text-leise); font-size: .8rem; }
+
+.replay-liste { display: flex; flex-direction: column; gap: 8px; }
+.replay-zeile {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  text-align: left; background: var(--bg-2);
+}
+.replay-nr { font-weight: 700; min-width: 5.5rem; }
+.replay-meta { flex: 1; color: var(--text-leise); font-size: .9rem; }
+.replay-go { color: var(--akzent); font-size: .9rem; }
 
 .kante { stroke: #38435c; stroke-width: .035; }
 .knoten { fill: #222b3f; stroke: #3d4a66; stroke-width: .05; }

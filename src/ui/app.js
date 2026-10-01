@@ -5,6 +5,8 @@ import { resolve } from '../engine/resolver.js';
 import { botOrders, mulberry32 } from '../engine/bots.js';
 import { TYPES, TYPE_INFO, PLAYER_NAMES } from '../engine/rules.js';
 import { boardSvg } from './board.js';
+import { isView3d, setView3d } from './view-flag.js';
+import { createReveal, PHASE } from './reveal.js';
 import { describeEvent, nodeName, winnerText } from './text.js';
 import { rulesHtml } from './rules-text.js';
 import {
@@ -20,6 +22,55 @@ import { normalisiereCode } from '../net/room.js';
 const SAVE_KEY = 'knotenpunkt.spielstand.v2';
 const ONLINE_KEY = 'knotenpunkt.online.v1';
 const root = document.getElementById('app');
+
+/** Merkt Brett-Optionen fuer die 3D-Mount-Phase nach root.innerHTML. */
+let pendingBoard3d = null;
+
+/** Aktive Aufdeckungs-Sequenz (Praesentation only). */
+let activeReveal = null;
+let revealKey = null;
+let lastRevealFrame = null;
+
+/** Lazy Three.js-Modul (nur bei 3D geladen). */
+let board3dMod = null;
+let board3dLoading = null;
+
+function loadBoard3d() {
+  if (board3dMod) return Promise.resolve(board3dMod);
+  if (!board3dLoading) {
+    board3dLoading = import('./board3d.js').then((m) => {
+      board3dMod = m;
+      return m;
+    }).catch((err) => {
+      board3dLoading = null;
+      console.warn('3D-Modul nicht ladbar:', err);
+      return null;
+    });
+  }
+  return board3dLoading;
+}
+
+function detachBoard3dIfLoaded() {
+  board3dMod?.detachBoard3d?.();
+}
+
+function disposeBoard3dIfLoaded() {
+  board3dMod?.disposeBoard3d?.();
+}
+
+/**
+ * Brett-Inhalt: SVG-Markup oder 3D-Host. Aufrufer umschliesst mit .brett.
+ * Gleiche Order-API wie boardSvg; Engine unberuehrt.
+ * @param {object} options  Argumente wie bei boardSvg(...)
+ */
+function brettContent(options) {
+  if (isView3d()) {
+    pendingBoard3d = options;
+    return '<div class="brett-3d-host" data-board3d="1"></div>';
+  }
+  pendingBoard3d = null;
+  return boardSvg(options);
+}
 
 const app = {
   screen: 'menu',
@@ -41,14 +92,17 @@ const app = {
   queueIndex: 0,
   working: null,      // Befehle des gerade aktiven Spielers
   selection: null,    // {unitId, mode}
-  lastResult: null,   // {events, orders, before}
+  lastResult: null,   // {events, orders, builds, before, after}
+  revealUi: null,     // {status, phase} - Praesentation
+  verlauf: [],        // Offline-Archiv fuer Replay (keine Regelwirkung)
+  replay: null,       // {runde} wenn eine alte Runde nachgespielt wird
   previousScreen: 'menu',
 
   // Online
   online: null,       // OnlineSitzung, solange eine Netzpartie laeuft
   onlineForm: { name: '', code: '', fehler: null, entwurf: '', laedt: false, kopiert: false },
   gesehenBis: 0,      // bis zu dieser Runde wurde die Auswertung schon angeschaut
-  ansicht: null,      // {runde, stufe:'reveal'|'ergebnis'} beim Nachschauen
+  ansicht: null,      // {runde, stufe:'reveal'|'ergebnis', replay?} beim Nachschauen
   wartenSeit: 0,
 };
 
@@ -60,7 +114,7 @@ function save() {
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       game: app.game, pending: app.pending, queue: app.queue,
       queueIndex: app.queueIndex, working: app.working, screen: app.screen,
-      lastResult: app.lastResult, setup: app.setup,
+      lastResult: app.lastResult, setup: app.setup, verlauf: app.verlauf,
     }));
   } catch (_) { /* privater Modus: dann eben ohne Speichern */ }
 }
@@ -80,9 +134,15 @@ function resume() {
     queueIndex: d.queueIndex || 0, working: d.working || null,
     screen: d.screen || 'orders', lastResult: d.lastResult || null,
     setup: d.setup || app.setup, selection: null,
+    verlauf: Array.isArray(d.verlauf) ? d.verlauf : [],
+    replay: null,
   });
   if (app.screen === 'menu') app.screen = 'orders';
   return true;
+}
+
+function cloneJson(x) {
+  return JSON.parse(JSON.stringify(x));
 }
 
 // ------------------------------------------------------------- Spielablauf
@@ -104,6 +164,8 @@ function newGame() {
   app.game.botSeed = Math.floor(Math.random() * 1e9);
   app.pending = {};
   app.lastResult = null;
+  app.verlauf = [];
+  app.replay = null;
   startRound();
 }
 
@@ -114,8 +176,9 @@ function startRound() {
   app.queueIndex = 0;
   if (app.queue.length === 0) {
     app.working = null;
-    app.screen = 'reveal';
     collectBotOrders();
+    prepareReveal();
+    app.screen = 'reveal';
   } else {
     beginTurn();
   }
@@ -143,6 +206,7 @@ function finishTurn() {
     beginTurn();
   } else {
     collectBotOrders();
+    prepareReveal();
     app.screen = 'reveal';
   }
   save();
@@ -168,15 +232,191 @@ function mergedOrders() {
   return { unitOrders, builds };
 }
 
-function doResolve() {
+/** Resolve einmalig; app.game bleibt before bis finishReveal (Fairness). */
+function prepareReveal() {
+  stopReveal();
   const before = app.game;
   const merged = mergedOrders();
   const res = resolve(before, merged);
-  app.lastResult = { events: res.events, orders: merged.unitOrders, before };
-  app.game = res.state;
+  app.lastResult = {
+    events: res.events,
+    orders: merged.unitOrders,
+    builds: merged.builds,
+    before,
+    after: res.state,
+  };
+  // Archiv nur fuer Replay/Spectator-Praesentation
+  app.verlauf.push({
+    runde: before.round,
+    before: cloneJson(before),
+    orders: cloneJson(merged.unitOrders),
+    builds: cloneJson(merged.builds),
+    events: cloneJson(res.events),
+    after: cloneJson(res.state),
+  });
+  app.revealUi = { status: isView3d() ? 'ready' : 'done', phase: null };
+}
+
+function offlineVerlaufEintrag(runde) {
+  return (app.verlauf || []).find((v) => v.runde === Number(runde)) || null;
+}
+
+function revealPayload() {
+  if (app.screen === 'replay-reveal' && app.replay) {
+    const v = offlineVerlaufEintrag(app.replay.runde);
+    if (!v) return null;
+    return {
+      before: v.before, orders: v.orders, builds: v.builds,
+      events: v.events, after: v.after,
+    };
+  }
+  if ((app.screen === 'online-reveal' || app.screen === 'online-result') && app.ansicht) {
+    const v = verlaufEintrag(app.ansicht.runde);
+    if (!v) return null;
+    return {
+      before: v.before,
+      orders: v.orders,
+      builds: v.builds,
+      events: v.events,
+      after: zustandNach(v.runde),
+    };
+  }
+  return app.lastResult;
+}
+
+function stopReveal() {
+  if (activeReveal) {
+    try { activeReveal.cancel(); } catch (_) { /* ok */ }
+  }
+  activeReveal = null;
+  revealKey = null;
+  lastRevealFrame = null;
+}
+
+function finishReveal() {
+  stopReveal();
+  if (app.screen === 'replay-reveal' || app.replay) {
+    app.screen = 'replay-result';
+    app.revealUi = null;
+    render();
+    return;
+  }
+  if (app.online) {
+    if (app.ansicht) app.ansicht.stufe = 'ergebnis';
+    app.screen = 'online-result';
+    app.revealUi = null;
+    render();
+    return;
+  }
+  if (app.lastResult?.after) app.game = app.lastResult.after;
+  app.revealUi = null;
   app.screen = 'result';
   save();
   render();
+}
+
+function revealChromeHtml() {
+  const ui = app.revealUi || { status: 'done' };
+  const view3d = isView3d();
+  const phaseHint = {
+    [PHASE.ORDERS]: 'Befehle werden aufgedeckt…',
+    [PHASE.MOVES]: 'Züge gleichzeitig…',
+    [PHASE.EFFECTS]: 'Kämpfe & Bau…',
+    [PHASE.DONE]: 'Aufdeckung fertig.',
+  }[ui.phase] || (view3d ? 'Aufdeckung…' : 'Alle Befehle offen');
+
+  if (!view3d || ui.status === 'done') {
+    return `
+      <div class="panel-kopf"><strong>${ui.status === 'done' && view3d ? 'Aufdeckung fertig' : 'Alle Befehle offen'}</strong></div>
+      <p class="hinweis">${view3d ? phaseHint : 'Durchgezogen = Bewegung, gestrichelt = Unterstützung.'}</p>`;
+  }
+  return `
+    <div class="panel-kopf"><strong>Gleichzeitige Aufdeckung</strong>
+      <span class="badge">${esc(phaseHint)}</span>
+    </div>
+    <div class="knopfreihe">
+      ${ui.status === 'paused'
+    ? '<button data-action="reveal-resume">Fortsetzen</button>'
+    : '<button data-action="reveal-pause">Pause</button>'}
+      <button data-action="reveal-skip">Überspringen</button>
+    </div>
+    <p class="hinweis">Timing ändert den Spielstand nicht. Überspringen springt zum Ergebnis.</p>`;
+}
+
+function updateRevealChrome() {
+  const el = root.querySelector('[data-reveal-chrome]');
+  if (el) el.innerHTML = revealChromeHtml();
+  const actions = root.querySelector('[data-reveal-actions]');
+  if (actions) actions.innerHTML = revealActionsHtml();
+}
+
+function revealActionsHtml() {
+  const ui = app.revealUi || { status: 'done' };
+  const online = app.screen === 'online-reveal';
+  const replay = app.screen === 'replay-reveal' || !!app.ansicht?.replay;
+  const done = !isView3d() || ui.status === 'done';
+  if (!done) {
+    return `
+      <button class="neben" data-action="reveal-skip">Überspringen</button>`;
+  }
+  if (app.screen === 'replay-reveal') {
+    return `
+      <button class="haupt" data-action="auswerten">Weiter zur Auswertung</button>
+      <button class="neben klein" data-action="replay-liste">Alle Runden</button>`;
+  }
+  return `
+    <button class="haupt" data-action="${online ? 'online-ergebnis' : 'auswerten'}">
+      ${online ? (replay ? 'Ergebnis (Replay)' : 'Ergebnis') : 'Weiter zur Auswertung'}
+    </button>`;
+}
+
+function maybeStartReveal() {
+  const payload = revealPayload();
+  if (!payload?.before || !payload.after) return;
+
+  if (!isView3d()) {
+    app.revealUi = { status: 'done', phase: PHASE.DONE };
+    return;
+  }
+
+  const key = app.online
+    ? `online-${app.ansicht?.runde}-${app.ansicht?.replay ? 'rp' : 'live'}`
+    : app.replay
+      ? `replay-${app.replay.runde}`
+      : `off-${payload.before.round}-${payload.events?.length || 0}`;
+
+  if (activeReveal && revealKey === key) {
+    if (lastRevealFrame && board3dMod?.getBoard3d?.()) {
+      board3dMod.applyBoard3dReveal(lastRevealFrame);
+    }
+    return;
+  }
+
+  stopReveal();
+  revealKey = key;
+  app.revealUi = { status: 'playing', phase: PHASE.ORDERS };
+  activeReveal = createReveal(payload, {
+    onUpdate(frame) {
+      lastRevealFrame = frame;
+      if (board3dMod?.getBoard3d?.()) board3dMod.applyBoard3dReveal(frame);
+      const prevPhase = app.revealUi?.phase;
+      const prevStatus = app.revealUi?.status;
+      app.revealUi = { status: activeReveal?.status || frame.status, phase: frame.phase };
+      if (frame.phase !== prevPhase || frame.status !== prevStatus) updateRevealChrome();
+    },
+  });
+  // Sofort Playing-Chrome, auch bevor der erste RAF kommt
+  updateRevealChrome();
+  activeReveal.start().then(() => {
+    if (revealKey !== key) return;
+    app.revealUi = { status: 'done', phase: PHASE.DONE };
+    updateRevealChrome();
+  });
+}
+
+/** @deprecated resolve passiert in prepareReveal; bleibt als Alias fuer Klarheit. */
+function doResolve() {
+  finishReveal();
 }
 
 function nextRound() {
@@ -428,16 +668,50 @@ const actions = {
     render();
   },
   'befehle-fertig': () => finishTurn(),
-  'auswerten': () => doResolve(),
+  'auswerten': () => finishReveal(),
+  'reveal-weiter': () => finishReveal(),
+  'reveal-pause': () => {
+    activeReveal?.pause();
+    app.revealUi = { ...(app.revealUi || {}), status: 'paused' };
+    updateRevealChrome();
+  },
+  'reveal-resume': () => {
+    activeReveal?.resume();
+    app.revealUi = { ...(app.revealUi || {}), status: 'playing' };
+    updateRevealChrome();
+  },
+  'reveal-skip': () => {
+    if (activeReveal && activeReveal.status !== 'done') activeReveal.skip();
+    else {
+      app.revealUi = { status: 'done', phase: PHASE.DONE };
+      updateRevealChrome();
+    }
+  },
   'weiter': () => nextRound(),
   'aufgeben': () => {
     if (app.online) { actions['online-verlassen'](); return; }
     if (confirm('Partie wirklich beenden?')) {
+      stopReveal();
       app.game = null;
       app.screen = 'menu';
       localStorage.removeItem(SAVE_KEY);
       render();
     }
+  },
+  'view-3d': () => {
+    setView3d(true);
+    const url = new URL(location.href);
+    url.searchParams.set('view', '3d');
+    history.replaceState(null, '', url);
+    loadBoard3d().finally(() => render());
+  },
+  'view-2d': () => {
+    setView3d(false);
+    const url = new URL(location.href);
+    url.searchParams.delete('view');
+    history.replaceState(null, '', url);
+    disposeBoard3dIfLoaded();
+    render();
   },
 
   // ------------------------------------------------------------------ Online
@@ -510,8 +784,21 @@ const actions = {
     await app.online.uebernimmBot(Number(d.seat));
   }),
 
-  'online-ergebnis': () => { app.ansicht.stufe = 'ergebnis'; app.screen = 'online-result'; render(); },
+  'online-ergebnis': () => {
+    stopReveal();
+    if (app.ansicht) app.ansicht.stufe = 'ergebnis';
+    app.screen = 'online-result';
+    app.revealUi = null;
+    render();
+  },
   'online-weiter': () => {
+    if (app.ansicht?.replay) {
+      app.ansicht = null;
+      app.previousScreen = app.previousScreen || 'warten';
+      app.screen = 'replay-liste-online';
+      render();
+      return;
+    }
     app.gesehenBis = app.ansicht.runde;
     app.ansicht = null;
     waehleOnlineBildschirm();
@@ -520,6 +807,59 @@ const actions = {
 
   'online-verlassen': () => {
     if (confirm('Raum verlassen? Die Partie läuft ohne dich weiter.')) verlasseOnline();
+  },
+
+  'replay-liste': () => {
+    stopReveal();
+    app.replay = null;
+    app.revealUi = null;
+    app.previousScreen = app.screen === 'gameover' ? 'gameover'
+      : (app.online ? (app.screen || 'warten') : (app.game?.phase === 'finished' ? 'gameover' : 'result'));
+    app.screen = app.online ? 'replay-liste-online' : 'replay-liste';
+    render();
+  },
+  'replay-runde': (d) => {
+    const runde = Number(d.runde);
+    stopReveal();
+    if (app.online) {
+      app.ansicht = { runde, stufe: 'reveal', replay: true };
+      app.revealUi = { status: isView3d() ? 'ready' : 'done', phase: null };
+      app.screen = 'online-reveal';
+    } else {
+      app.replay = { runde };
+      app.revealUi = { status: isView3d() ? 'ready' : 'done', phase: null };
+      app.screen = 'replay-reveal';
+    }
+    render();
+  },
+  'replay-wiederholen': () => {
+    if (!app.lastResult) return;
+    stopReveal();
+    app.replay = { runde: app.lastResult.before.round };
+    app.revealUi = { status: isView3d() ? 'ready' : 'done', phase: null };
+    app.screen = 'replay-reveal';
+    render();
+  },
+  'replay-zurueck': () => {
+    stopReveal();
+    app.replay = null;
+    app.ansicht = null;
+    app.revealUi = null;
+    if (app.online) {
+      waehleOnlineBildschirm();
+    } else if (app.game?.phase === 'finished') {
+      app.screen = 'gameover';
+    } else if (app.lastResult) {
+      app.screen = 'result';
+    } else {
+      app.screen = app.previousScreen || 'menu';
+    }
+    render();
+  },
+  'replay-result-fertig': () => {
+    app.replay = null;
+    app.screen = 'replay-liste';
+    render();
   },
 };
 
@@ -545,6 +885,9 @@ root.addEventListener('input', (ev) => {
 // ------------------------------------------------------------------ Rendern
 function render() {
   const f = app.onlineForm;
+  pendingBoard3d = null;
+  // WebGL-Canvas vor dem DOM-Wipe sichern
+  detachBoard3dIfLoaded();
   const html = {
     menu: viewMenu,
     pass: viewPass,
@@ -553,6 +896,21 @@ function render() {
     result: () => viewResult(app.game, app.lastResult),
     gameover: viewGameOver,
     regeln: viewRules,
+    'replay-liste': () => viewReplayListe(false),
+    'replay-liste-online': () => viewReplayListe(true),
+    'replay-reveal': () => {
+      const v = offlineVerlaufEintrag(app.replay?.runde);
+      return viewReveal(v?.before || app.game, {
+        unitOrders: v?.orders || {}, builds: v?.builds || {},
+      }, false);
+    },
+    'replay-result': () => {
+      const v = offlineVerlaufEintrag(app.replay?.runde);
+      if (!v) return viewReplayListe(false);
+      return viewResult(v.after, {
+        events: v.events, orders: v.orders, before: v.before,
+      }, false, true);
+    },
 
     verbinden: () => viewVerbinden({ text: f.fehler || 'Verbinde…' }),
     online: () => viewOnlineStart({
@@ -572,16 +930,20 @@ function render() {
     warten: () => viewWarten({
       sitzung: app.online,
       statusHtml: statusBar(app.game, app.online.sitz),
-      brettHtml: boardSvg({
+      brettHtml: brettContent({
         state: app.game, orders: app.working?.unitOrders || {},
         viewerId: app.online.sitz, showOrdersOf: app.online.sitz,
       }),
       wartetSeit: app.wartenSeit ? Date.now() - app.wartenSeit : 0,
+      view3d: isView3d(),
+      kannReplay: (app.online.verlauf || []).length > 0,
     }),
     'online-bot': () => viewOnlineBot({
       sitzung: app.online,
       statusHtml: statusBar(app.game, app.online.sitz),
-      brettHtml: boardSvg({ state: app.game, orders: {}, viewerId: app.online.sitz, showOrdersOf: null }),
+      brettHtml: brettContent({ state: app.game, orders: {}, viewerId: app.online.sitz, showOrdersOf: null }),
+      view3d: isView3d(),
+      kannReplay: (app.online.verlauf || []).length > 0,
     }),
     'online-reveal': () => {
       const v = verlaufEintrag(app.ansicht.runde);
@@ -594,6 +956,37 @@ function render() {
   }[app.screen];
   root.innerHTML = html ? html() : viewMenu();
   root.scrollTop = 0;
+
+  const needReveal = app.screen === 'reveal'
+    || app.screen === 'online-reveal'
+    || app.screen === 'replay-reveal';
+
+  if (pendingBoard3d) {
+    const host = root.querySelector('[data-board3d]');
+    const opts = pendingBoard3d;
+    if (!needReveal && activeReveal) stopReveal();
+    loadBoard3d().then((mod) => {
+      if (!host?.isConnected) return;
+      if (!mod) {
+        host.innerHTML = boardSvg(opts);
+        host.removeAttribute('data-board3d');
+        host.classList.remove('brett-3d-host');
+        if (needReveal) maybeStartReveal();
+        return;
+      }
+      const mounted = mod.mountBoard3d(host, opts, handleNodeTap);
+      if (!mounted && host.isConnected) {
+        host.innerHTML = boardSvg(opts);
+        host.removeAttribute('data-board3d');
+        host.classList.remove('brett-3d-host');
+      }
+      if (needReveal) maybeStartReveal();
+    });
+  } else {
+    disposeBoard3dIfLoaded();
+    if (needReveal) maybeStartReveal();
+    else if (activeReveal) stopReveal();
+  }
 }
 
 function esc(s) {
@@ -603,6 +996,7 @@ function esc(s) {
 function viewMenu() {
   const s = app.setup;
   const hasSave = !!loadSaved();
+  const view3d = isView3d();
   const counts = [2, 3, 4, 5, 6].map((n) => `
     <button class="chip ${s.playerCount === n ? 'aktiv' : ''}" data-action="spielerzahl" data-wert="${n}">${n}</button>`).join('');
   const seats = s.seats.slice(0, s.playerCount).map((seat, i) => `
@@ -636,6 +1030,11 @@ function viewMenu() {
       </div>` : ''}
       <h2>Plätze</h2>
       ${seats}
+      <h2>Ansicht</h2>
+      <div class="segment">
+        <button class="${!view3d ? 'aktiv' : ''}" data-action="view-2d">2D</button>
+        <button class="${view3d ? 'aktiv' : ''}" data-action="view-3d">3D</button>
+      </div>
     </section>
     <div class="aktionen">
       <button class="haupt" data-action="starten">Auf diesem Gerät spielen</button>
@@ -643,7 +1042,7 @@ function viewMenu() {
       ${hasSave ? '<button class="neben" data-action="fortsetzen">Letzte Partie fortsetzen</button>' : ''}
       <button class="neben" data-action="regeln">Regeln</button>
     </div>
-    <p class="fuss">Auf einem Gerät wird nach jedem Zug weitergereicht. Online spielt jeder auf seinem eigenen Handy.</p>
+    <p class="fuss">Auf einem Gerät wird nach jedem Zug weitergereicht. Online spielt jeder auf seinem eigenen Handy.${view3d ? ' 3D-Ansicht aktiv (?view=3d).' : ''}</p>
   </div>`;
 }
 
@@ -693,7 +1092,7 @@ function viewOrders() {
   const sel = app.selection;
   const highlight = sel && sel.mode ? validTargets(sel.unitId, sel.mode) : [];
 
-  const board = boardSvg({
+  const board = brettContent({
     state: g,
     orders: app.working.unitOrders,
     selection: sel,
@@ -749,7 +1148,7 @@ function viewOrders() {
   return `
   <div class="seite spiel" style="--spieler:${p.color}">
     ${statusBar(g, me)}
-    <div class="brett">${board}</div>
+    <div class="brett${isView3d() ? ' brett-3d' : ''}">${board}</div>
     ${panel}
     <div class="aktionen fix">
       <button class="haupt" data-action="befehle-fertig">Befehle abschließen</button>
@@ -760,42 +1159,96 @@ function viewOrders() {
 }
 
 function viewReveal(g, merged, onlineModus = false) {
-  const board = boardSvg({ state: g, orders: merged.unitOrders, showOrdersOf: 'alle', viewerId: null });
-  const buildRows = g.players
-    .filter((p) => merged.builds[p.id])
-    .map((p) => `<li><span class="punkt" style="background:${p.color}"></span>${esc(p.name)} baut ${TYPE_INFO[merged.builds[p.id]].name}</li>`)
+  // Offline: g ist before (app.game noch unveraendert). Online/Replay: aus Payload.
+  const payload = (onlineModus || app.screen === 'replay-reveal')
+    ? revealPayload()
+    : app.lastResult;
+  const before = payload?.before || g;
+  const orders = payload?.orders || merged.unitOrders || {};
+  const animate = isView3d() && (app.revealUi?.status !== 'done');
+  const board = brettContent({
+    state: before,
+    orders,
+    showOrdersOf: 'alle',
+    viewerId: null,
+    animateOrders: animate,
+  });
+  const buildSrc = payload?.builds || merged.builds || {};
+  const buildRows = before.players
+    .filter((p) => buildSrc[p.id])
+    .map((p) => `<li><span class="punkt" style="background:${p.color}"></span>${esc(p.name)} baut ${TYPE_INFO[buildSrc[p.id]].name}</li>`)
     .join('');
+  const replayBadge = (app.screen === 'replay-reveal' || app.ansicht?.replay)
+    ? '<span class="badge">Replay</span>' : '';
   return `
   <div class="seite spiel">
-    ${statusBar(g, null)}
-    <div class="brett">${board}</div>
+    ${statusBar(before, null)}
+    <div class="brett${isView3d() ? ' brett-3d' : ''}">${board}</div>
     <div class="panel">
-      <div class="panel-kopf"><strong>Alle Befehle offen</strong></div>
-      <p class="hinweis">Durchgezogen = Bewegung, gestrichelt = Unterstützung.</p>
+      <div data-reveal-chrome>${revealChromeHtml()}</div>
+      ${replayBadge ? `<p class="hinweis">Nur Ansicht — der Spielstand bleibt unverändert. ${replayBadge}</p>` : ''}
       ${buildRows ? `<ul class="liste">${buildRows}</ul>` : ''}
     </div>
-    <div class="aktionen fix">
-      <button class="haupt" data-action="${onlineModus ? 'online-ergebnis' : 'auswerten'}">Auswerten</button>
+    <div class="aktionen fix" data-reveal-actions>
+      ${revealActionsHtml()}
     </div>
   </div>`;
 }
 
-function viewResult(g, r, onlineModus = false) {
-  const board = boardSvg({ state: g, orders: {}, viewerId: null, showOrdersOf: null });
+function viewResult(g, r, onlineModus = false, replayModus = false) {
+  const board = brettContent({ state: g, orders: {}, viewerId: null, showOrdersOf: null });
   const items = r.events.map((e) => describeEvent(r.before, e)).filter(Boolean);
   const list = items.length
     ? items.map((i) => `<li><span class="ikon" style="color:${i.owner !== undefined && g.players[i.owner] ? g.players[i.owner].color : 'inherit'}">${i.icon}</span> ${esc(i.text)}</li>`).join('')
     : '<li class="leer">Nichts hat sich bewegt.</li>';
+  const haupt = replayModus
+    ? 'replay-result-fertig'
+    : (onlineModus ? 'online-weiter' : 'weiter');
+  const hauptText = replayModus
+    ? 'Zurück zur Liste'
+    : (g.phase === 'finished' ? 'Ergebnis' : (onlineModus && app.ansicht?.replay ? 'Zurück' : 'Nächste Runde'));
   return `
   <div class="seite spiel">
     ${statusBar(g, null)}
-    <div class="brett">${board}</div>
+    <div class="brett${isView3d() ? ' brett-3d' : ''}">${board}</div>
     <div class="panel scroll">
-      <div class="panel-kopf"><strong>Auswertung Runde ${r.before.round}</strong></div>
+      <div class="panel-kopf"><strong>Auswertung Runde ${r.before.round}</strong>
+        ${replayModus || app.ansicht?.replay ? '<span class="badge">Replay</span>' : ''}
+      </div>
       <ul class="liste">${list}</ul>
     </div>
     <div class="aktionen fix">
-      <button class="haupt" data-action="${onlineModus ? 'online-weiter' : 'weiter'}">${g.phase === 'finished' ? 'Ergebnis' : 'Nächste Runde'}</button>
+      <button class="haupt" data-action="${haupt}">${hauptText}</button>
+      ${!replayModus && !onlineModus && app.verlauf?.length
+    ? '<button class="neben klein" data-action="replay-wiederholen">Aufdeckung wiederholen</button>' : ''}
+      ${!replayModus && !onlineModus && app.verlauf?.length > 1
+    ? '<button class="neben klein" data-action="replay-liste">Alle Runden</button>' : ''}
+    </div>
+  </div>`;
+}
+
+function viewReplayListe(online) {
+  // Online: verlauf ist oeffentlich sobald die Runde gefaltet wurde (Spectator/Replay).
+  // Offline: lokales Archiv aus prepareReveal.
+  const rowsSrc = online ? (app.online?.verlauf || []) : (app.verlauf || []);
+  const rows = [...rowsSrc].sort((a, b) => a.runde - b.runde).map((v) => `
+    <button class="replay-zeile" data-action="replay-runde" data-runde="${v.runde}">
+      <span class="replay-nr">Runde ${v.runde}</span>
+      <span class="replay-meta">${(v.events || []).length} Ereignisse</span>
+      <span class="replay-go">Ansehen</span>
+    </button>`).join('');
+
+  return `
+  <div class="seite">
+    <header class="titel">
+      <h1>Replay</h1>
+      <p>Vergangene Runden nochmal ansehen — ohne den Spielstand zu ändern.</p>
+    </header>
+    <div class="karte replay-liste">
+      ${rows || '<p class="hinweis">Noch keine abgeschlossenen Runden.</p>'}
+    </div>
+    <div class="aktionen">
+      <button class="haupt" data-action="replay-zurueck">Zurück</button>
     </div>
   </div>`;
 }
@@ -823,6 +1276,8 @@ function viewGameOver() {
     <ul class="rangliste">${rows}</ul>
     <div class="aktionen">
       <button class="haupt" data-action="neues-spiel">Neue Partie</button>
+      ${(app.verlauf?.length || app.online?.verlauf?.length)
+    ? '<button class="neben" data-action="replay-liste">Replay</button>' : ''}
       <button class="neben" data-action="regeln">Regeln</button>
     </div>
   </div>`;
@@ -865,6 +1320,7 @@ function starteApp() {
 }
 
 starteApp();
+if (isView3d()) loadBoard3d(); // Prefetch, damit die erste 3D-Runde schneller startet
 
 // Tippt jemand auf einen Einladungslink, waehrend die App schon offen ist,
 // aendert sich nur der Anker - die Seite wird nicht neu geladen.

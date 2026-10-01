@@ -30,7 +30,7 @@ jobs:
       - name: Statische Dateien einsammeln
         run: |
           mkdir -p _site
-          cp -r index.html manifest.webmanifest sw.js css src icons _site/
+          cp -r index.html manifest.webmanifest sw.js css src icons vendor _site/
           cp RULES.md _site/ 2>/dev/null || true
       - uses: actions/upload-pages-artifact@v3
         with:

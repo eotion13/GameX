@@ -210,11 +210,30 @@ export function habeAbgegeben(raum, uid, runde) {
   return !!((raum.befehle || {})[String(runde)] || {})[uid];
 }
 
-/** Paket, wie es in die Datenbank geschrieben wird. */
+/** Paket, wie es in die Datenbank geschrieben wird.
+ * Optional `commit`: kurzer Hash ueber Befehle (Commit-Reveal Phase 3+).
+ * Alte Clients ignorieren das Feld; Faltung nutzt nur unitOrders/builds. */
 export function befehlspaket(orders) {
+  const unitOrders = orders?.unitOrders || {};
+  const builds = orders?.builds || {};
   return {
     fertig: true,
-    unitOrders: orders?.unitOrders || {},
-    builds: orders?.builds || {},
+    unitOrders,
+    builds,
+    commit: befehlsCommit(unitOrders, builds),
   };
+}
+
+/**
+ * Deterministischer Kurz-Hash (kein Geheimnis, nur Integritaetsmarker).
+ * Gleiche Befehle -> gleicher Commit auf jedem Client.
+ */
+export function befehlsCommit(unitOrders, builds) {
+  const payload = JSON.stringify({ unitOrders: unitOrders || {}, builds: builds || {} });
+  let h = 2166136261;
+  for (let i = 0; i < payload.length; i++) {
+    h ^= payload.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
 }

@@ -251,7 +251,7 @@ export function viewLobby({ sitzung, link, teams, kopiert, fehler }) {
 
 // ------------------------------------------------------------------- Warten
 
-export function viewWarten({ sitzung, statusHtml, brettHtml, wartetSeit }) {
+export function viewWarten({ sitzung, statusHtml, brettHtml, wartetSeit, view3d = false, kannReplay = false }) {
   const sitze = sitzeArray(sitzung.raum);
   const fehlende = sitzung.fehlende
     .filter((seat) => seat !== sitzung.sitz)
@@ -267,10 +267,32 @@ export function viewWarten({ sitzung, statusHtml, brettHtml, wartetSeit }) {
         </li>`).join('')
     : '<li class="leer">Alle sind fertig — wird gleich ausgewertet.</li>';
 
+  const overlayListe = fehlende.length
+    ? fehlende.map((s) => `
+        <li>
+          <span class="punkt" style="background:${PLAYER_COLORS[s.seat]}"></span>
+          ${esc(s.name)}
+        </li>`).join('')
+    : '<li class="leer">Alle fertig</li>';
+
+  const overlay = view3d ? `
+    <div class="warten-overlay" aria-live="polite">
+      <div class="warten-overlay-inner">
+        <strong>Warten</strong>
+        <p class="warten-overlay-sub">Es fehlen noch:</p>
+        <ul class="warten-overlay-liste">${overlayListe}</ul>
+        ${langeGenug && fehlende.length
+          ? '<p class="warten-overlay-hint">Lange nichts? Bot kann übernehmen (unten).</p>' : ''}
+      </div>
+    </div>` : '';
+
   return `
   <div class="seite spiel">
     ${statusHtml}
-    <div class="brett">${brettHtml}</div>
+    <div class="brett-wrap${view3d ? ' brett-wrap-3d' : ''}">
+      <div class="brett${brettHtml.includes('data-board3d') ? ' brett-3d' : ''}">${brettHtml}</div>
+      ${overlay}
+    </div>
     <div class="panel">
       <div class="panel-kopf"><strong>Befehle abgegeben</strong><span class="badge">Runde ${sitzung.spiel.round}</span></div>
       <p class="hinweis">Es fehlen noch:</p>
@@ -280,6 +302,7 @@ export function viewWarten({ sitzung, statusHtml, brettHtml, wartetSeit }) {
       ${sitzung.fehler ? fehlerBox(sitzung.fehler) : ''}
     </div>
     <div class="aktionen fix">
+      ${kannReplay ? '<button class="neben klein" data-action="replay-liste">Replay</button>' : ''}
       <button class="neben klein" data-action="regeln">Regeln</button>
       <button class="neben klein" data-action="online-verlassen">Verlassen</button>
     </div>
@@ -288,16 +311,27 @@ export function viewWarten({ sitzung, statusHtml, brettHtml, wartetSeit }) {
 
 // ------------------------------------------------------------------ Zuschauen
 
-export function viewOnlineBot({ sitzung, statusHtml, brettHtml }) {
+export function viewOnlineBot({ sitzung, statusHtml, brettHtml, view3d = false, kannReplay = false }) {
+  const overlay = view3d ? `
+    <div class="warten-overlay" aria-live="polite">
+      <div class="warten-overlay-inner">
+        <strong>Zuschauer</strong>
+        <p class="warten-overlay-sub">Dein Platz spielt ein Bot. Du siehst denselben Stand wie alle.</p>
+      </div>
+    </div>` : '';
   return `
   <div class="seite spiel">
     ${statusHtml}
-    <div class="brett">${brettHtml}</div>
+    <div class="brett-wrap${view3d ? ' brett-wrap-3d' : ''}">
+      <div class="brett${brettHtml.includes('data-board3d') ? ' brett-3d' : ''}">${brettHtml}</div>
+      ${overlay}
+    </div>
     <div class="panel">
-      <div class="panel-kopf"><strong>Dein Platz wird von einem Bot gespielt</strong></div>
-      <p class="hinweis">Du kannst zuschauen, wie die Partie zu Ende geht.</p>
+      <div class="panel-kopf"><strong>Zuschauer-Modus</strong><span class="badge">Bot spielt</span></div>
+      <p class="hinweis">Dein Platz wird von einem Bot gespielt. Du kannst zuschauen und vergangene Runden als Replay ansehen — ohne Extra-Informationen.</p>
     </div>
     <div class="aktionen fix">
+      ${kannReplay ? '<button class="neben" data-action="replay-liste">Replay</button>' : ''}
       <button class="neben klein" data-action="online-verlassen">Verlassen</button>
     </div>
   </div>`;

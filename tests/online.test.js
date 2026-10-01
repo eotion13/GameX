@@ -148,10 +148,28 @@ test('leere Befehle zaehlen trotzdem als abgegeben', () => {
   const spiel = erzeugeStartSpiel(raum);
   const paket = JSON.parse(JSON.stringify(befehlspaket({ unitOrders: {}, builds: {} })));
   assert.equal(paket.fertig, true, 'Firebase wuerde ein leeres Objekt sonst verwerfen');
+  assert.equal(typeof paket.commit, 'string');
+  assert.match(paket.commit, /^[0-9a-f]{8}$/);
   raum.befehle['1'] = { 'uid-0': paket, 'uid-1': paket };
   assert.equal(befehlsstand(raum, spiel, 1).vollstaendig, true);
   assert.equal(habeAbgegeben(raum, 'uid-0', 1), true);
   assert.equal(habeAbgegeben(raum, 'uid-1', 2), false);
+});
+
+test('Befehlspaket-Commit ist deterministisch und optional fuer die Faltung', () => {
+  const a = befehlspaket({ unitOrders: { u1: { action: 'halten' } }, builds: {} });
+  const b = befehlspaket({ unitOrders: { u1: { action: 'halten' } }, builds: {} });
+  const c = befehlspaket({ unitOrders: { u1: { action: 'bewegen', target: 'k' } }, builds: {} });
+  assert.equal(a.commit, b.commit);
+  assert.notEqual(a.commit, c.commit);
+  // Faltung ignoriert commit - Paket ohne commit bleibt gueltig
+  const raum = raumMitMenschen(2);
+  const spiel = erzeugeStartSpiel(raum);
+  raum.befehle['1'] = {
+    'uid-0': { fertig: true, unitOrders: {}, builds: {} },
+    'uid-1': { fertig: true, unitOrders: {}, builds: {}, commit: 'deadbeef' },
+  };
+  assert.equal(befehlsstand(raum, spiel, 1).vollstaendig, true);
 });
 
 // --- Schutz gegen fremde Befehle -----------------------------------------

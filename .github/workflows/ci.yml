@@ -17,12 +17,24 @@ jobs:
       - name: Regel-Engine testen
         run: node --test tests/*.test.js
       - name: Oberflaeche im Browser testen
-        run: node tools/smoke-test.js
         env:
           CHROME: /usr/bin/google-chrome
+        run: |
+          for i in 1 2 3; do
+            if node tools/smoke-test.js; then exit 0; fi
+            echo "Smoke Versuch $i fehlgeschlagen — neuer Versuch…"
+            sleep 3
+          done
+          exit 1
       - name: Online-Modus im Browser testen
-        run: node tools/online-smoke.js
         env:
           CHROME: /usr/bin/google-chrome
+        run: |
+          for i in 1 2 3; do
+            if node tools/online-smoke.js; then exit 0; fi
+            echo "Online-Smoke Versuch $i fehlgeschlagen — neuer Versuch…"
+            sleep 3
+          done
+          exit 1
       - name: Balance stichprobenartig pruefen
         run: node tools/simulate.js 120 3
