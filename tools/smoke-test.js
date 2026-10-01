@@ -64,14 +64,9 @@ if (!chromium) {
 }
 
 const server = spawn(process.execPath, ['tools/serve.js'], { env: { ...process.env, PORT: String(PORT) }, stdio: 'ignore' });
-const browser = spawn(chromium, [
-  '--headless=new', '--disable-gpu', '--no-sandbox', '--hide-scrollbars',
-  '--disable-dev-shm-usage', '--disable-extensions', '--no-first-run',
-  `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${PROFILE}`,
-  'about:blank',
-], { stdio: 'ignore' });
+let browser = null;
 
-const aufraeumen = () => { server.kill(); browser.kill(); };
+const aufraeumen = () => { server.kill(); browser?.kill(); };
 process.on('exit', aufraeumen);
 
 let fehlerZahl = 0;
@@ -79,6 +74,18 @@ const meldung = (ok, text) => {
   if (!ok) fehlerZahl++;
   console.log(`${ok ? '  ok  ' : ' FEHL '} ${text}`);
 };
+
+function starteBrowser(versuch) {
+  browser?.kill();
+  const profil = `${PROFILE}-v${versuch}`;
+  browser = spawn(chromium, [
+    '--headless=new', '--disable-gpu', '--no-sandbox', '--hide-scrollbars',
+    '--disable-dev-shm-usage', '--disable-extensions', '--no-first-run',
+    '--remote-allow-origins=*',
+    `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${profil}`,
+    'about:blank',
+  ], { stdio: 'ignore' });
+}
 
 async function warteAufChrome() {
   for (let i = 0; i < 40; i++) {
@@ -91,16 +98,26 @@ async function warteAufChrome() {
   return false;
 }
 
-try {
-  if (!(await warteAufChrome())) throw new Error('Chromium nicht erreichbar');
-  let ziel = null;
-  for (let i = 0; i < 30 && !ziel; i++) {
-    try {
-      const liste = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/new?http://127.0.0.1:${PORT}/index.html`, { method: 'PUT' })).json();
-      ziel = liste.webSocketDebuggerUrl;
-    } catch { await warte(400); }
+async function verbindeChrome() {
+  for (let versuch = 1; versuch <= 3; versuch++) {
+    starteBrowser(versuch);
+    if (!(await warteAufChrome())) {
+      console.log(`  … Chrome-Start Versuch ${versuch} ohne Debug-Port`);
+      continue;
+    }
+    for (let i = 0; i < 20; i++) {
+      try {
+        const liste = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/new?http://127.0.0.1:${PORT}/index.html`, { method: 'PUT' })).json();
+        if (liste.webSocketDebuggerUrl) return liste.webSocketDebuggerUrl;
+      } catch { await warte(400); }
+    }
+    console.log(`  … Chrome-Tab Versuch ${versuch} fehlgeschlagen`);
   }
-  if (!ziel) throw new Error('Chromium nicht erreichbar');
+  throw new Error('Chromium nicht erreichbar');
+}
+
+try {
+  const ziel = await verbindeChrome();
 
   const cdp = await CDP.verbinde(ziel);
   await cdp.send('Page.enable');
