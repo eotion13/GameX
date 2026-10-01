@@ -5,10 +5,10 @@ import * as THREE from '../../vendor/three/three.module.min.js';
 import { OrbitControls } from '../../vendor/three/OrbitControls.js';
 import { TYPE_INFO } from '../engine/rules.js';
 import { occupancy } from '../engine/state.js';
+import { createFigureMesh } from './figures.js';
 
 const VIEW_KEY = 'knotenpunkt.view';
 const NODE_R = 0.32;
-const UNIT_Y = 0.28;
 
 /** Feature-Flag: 3D-View statt SVG. */
 export function isView3d() {
@@ -33,23 +33,6 @@ function hexColor(hex) {
   return new THREE.Color(hex || '#888888');
 }
 
-function unitGeometry(type) {
-  if (type === 'reiter') {
-    const g = new THREE.ConeGeometry(0.18, 0.48, 8);
-    g.translate(0, 0.24, 0);
-    return g;
-  }
-  if (type === 'bogen') {
-    const g = new THREE.CylinderGeometry(0.06, 0.1, 0.5, 8);
-    g.translate(0, 0.25, 0);
-    return g;
-  }
-  // schild: flache Platte
-  const g = new THREE.BoxGeometry(0.34, 0.42, 0.12);
-  g.translate(0, 0.21, 0);
-  return g;
-}
-
 /**
  * Langlebige 3D-Ansicht. Canvas wird vor root.innerHTML abgekoppelt
  * und danach wieder eingehaengt, damit der WebGL-Kontext erhalten bleibt.
@@ -60,7 +43,11 @@ export class Board3DView {
     this.options = null;
     this.onNodeTap = null;
     this._raf = 0;
-    this._nodeMeshes = new Map(); // nodeId -> platform mesh (fuer Picking)
+    this._nodeMeshes = new Map();
+    this._unitRoots = new Map(); // unitId -> Object3D
+    this._orderGroup = new THREE.Group();
+    this._flashMeshes = new Map();
+    this._revealFrame = null;
     this._content = new THREE.Group();
     this._pointer = new THREE.Vector2();
     this._raycaster = new THREE.Raycaster();
@@ -100,8 +87,9 @@ export class Board3DView {
     this.controls.enablePan = false;
     this.controls.minDistance = 5;
     this.controls.maxDistance = 16;
+    // Top-down-ish: kein flacher Cheat-Winkel auf Gegnerbefehle
     this.controls.minPolarAngle = 0.18;
-    this.controls.maxPolarAngle = Math.PI * 0.42; // top-down-ish, kein Cheat-Winkel
+    this.controls.maxPolarAngle = Math.PI * 0.42;
     this.controls.target.set(0, 0, 0);
 
     this._onPointerDown = (ev) => {
@@ -128,7 +116,6 @@ export class Board3DView {
     this.canvas.addEventListener('pointercancel', () => { this._pointerDown = null; });
   }
 
-  /** Canvas aus dem DOM nehmen (vor innerHTML), Instanz behalten. */
   detach() {
     if (this.canvas.parentElement) this.canvas.parentElement.removeChild(this.canvas);
     this.host = null;
@@ -154,7 +141,87 @@ export class Board3DView {
 
   sync(options) {
     this.options = options;
+    this._revealFrame = null;
     this._rebuild();
+  }
+
+  /**
+   * Reveal-Frame anwenden (keine Zustandsmutation).
+   * Erwartet Frame aus reveal.sampleFrame / createReveal.
+   */
+  applyRevealFrame(frame) {
+    this._revealFrame = frame;
+    if (!frame || !this.options?.state) return;
+
+    // Befehls-Pfeile ein-/ausblenden
+    const op = frame.orderOpacity ?? 0;
+    this._orderGroup.visible = op > 0.02;
+    this._orderGroup.traverse((obj) => {
+      if (obj.material && obj.material.opacity !== undefined) {
+        obj.material.transparent = true;
+        obj.material.opacity = (obj.userData.baseOpacity ?? 0.9) * op;
+      }
+    });
+
+    // Einheitenpositionen / Scale / Opacity
+    for (const [unitId, root] of this._unitRoots) {
+      const pos = frame.unitPos?.[unitId];
+      const sc = frame.unitScale?.[unitId];
+      const opa = frame.unitOpacity?.[unitId];
+      if (pos) {
+        root.position.set(pos.x, 0.08 + (pos.y || 0), pos.z);
+      }
+      const s = sc === undefined ? 1 : sc;
+      root.scale.setScalar(Math.max(0.001, s));
+      root.visible = (opa === undefined ? 1 : opa) > 0.02 && s > 0.02;
+      root.traverse((obj) => {
+        if (obj.isMesh && obj.material) {
+          obj.material.transparent = true;
+          obj.material.opacity = opa === undefined ? 1 : opa;
+        }
+      });
+    }
+
+    // Neu gebaute Einheiten spaeten
+    for (const unitId of Object.keys(frame.unitPos || {})) {
+      const pos = frame.unitPos[unitId];
+      if (!pos?.spawn || this._unitRoots.has(unitId)) continue;
+      const state = this.options.state;
+      const col = hexColor(state.players[pos.owner]?.color);
+      const mesh = createFigureMesh(pos.unitType, col);
+      const root = new THREE.Group();
+      root.add(mesh);
+      const label = makeTextSprite(TYPE_INFO[pos.unitType].short);
+      label.position.set(0, 0.72, 0);
+      root.add(label);
+      root.position.set(pos.x, 0.08 + (pos.y || 0), pos.z);
+      root.scale.setScalar(Math.max(0.001, frame.unitScale?.[unitId] ?? 1));
+      root.userData.unitId = unitId;
+      this._content.add(root);
+      this._unitRoots.set(unitId, root);
+    }
+
+    // Quellen-Flash (Besitzwechsel)
+    for (const [nodeId, flash] of Object.entries(frame.controlFlash || {})) {
+      let ring = this._flashMeshes.get(nodeId);
+      const n = this.options.state.board.nodes[nodeId];
+      if (!n) continue;
+      if (!ring) {
+        const col = hexColor(this.options.state.players[flash.owner]?.color);
+        ring = new THREE.Mesh(
+          new THREE.RingGeometry(NODE_R + 0.05, NODE_R + 0.28, 28),
+          new THREE.MeshBasicMaterial({
+            color: col, transparent: true, opacity: 0, side: THREE.DoubleSide,
+          }),
+        );
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(n.x, 0.16, n.y);
+        this._content.add(ring);
+        this._flashMeshes.set(nodeId, ring);
+      }
+      ring.material.opacity = 0.75 * (flash.intensity || 0);
+      ring.visible = (flash.intensity || 0) > 0.02;
+    }
   }
 
   resize() {
@@ -215,6 +282,9 @@ export class Board3DView {
     this._disposeObject(this._content);
     this._content.clear();
     this._nodeMeshes.clear();
+    this._unitRoots.clear();
+    this._flashMeshes.clear();
+    this._orderGroup = new THREE.Group();
 
     const o = this.options;
     if (!o || !o.state) return;
@@ -223,8 +293,10 @@ export class Board3DView {
     const occ = occupancy(state);
     const highlight = new Set(o.highlight || []);
     const ordered = o.ordered || new Set();
+    // Reveal: Pfeile erst per Frame einblenden, wenn animateOrders gesetzt
+    const animateOrders = !!o.animateOrders;
+    const initialOrderOpacity = animateOrders ? 0 : 1;
 
-    // Bodenplatte (dezente Atmosphaere)
     const floor = new THREE.Mesh(
       new THREE.CircleGeometry((board.radius || board.rings) + 1.4, 48),
       new THREE.MeshStandardMaterial({
@@ -233,10 +305,8 @@ export class Board3DView {
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.04;
-    floor.receiveShadow = false;
     this._content.add(floor);
 
-    // Kanten als Stege
     const drawn = new Set();
     const edgeMat = new THREE.MeshStandardMaterial({
       color: 0x3a4560, roughness: 0.7, metalness: 0.15,
@@ -263,7 +333,6 @@ export class Board3DView {
       }
     }
 
-    // Knoten-Plattformen
     for (const id of board.order) {
       const n = board.nodes[id];
       const controller = state.control[id];
@@ -288,7 +357,6 @@ export class Board3DView {
       this._content.add(plat);
       this._nodeMeshes.set(id, plat);
 
-      // Unsichtbare groessere Pick-Flaeche
       const hit = new THREE.Mesh(
         new THREE.CylinderGeometry(NODE_R + 0.18, NODE_R + 0.18, 0.2, 12),
         new THREE.MeshBasicMaterial({ visible: false }),
@@ -337,7 +405,7 @@ export class Board3DView {
       }
     }
 
-    // Befehlspfeile (Linien)
+    // Befehlspfeile
     const orders = o.orders || {};
     for (const unitId in orders) {
       const u = state.units[unitId];
@@ -354,36 +422,40 @@ export class Board3DView {
         new THREE.Vector3(a.x, y, a.y),
         new THREE.Vector3(b.x, y, b.y),
       ];
+      const baseOp = ord.action === 'bewegen' ? 0.95 : 0.55;
       const geo = new THREE.BufferGeometry().setFromPoints(points);
       const mat = new THREE.LineBasicMaterial({
         color: col,
-        linewidth: 2,
         transparent: true,
-        opacity: ord.action === 'bewegen' ? 0.95 : 0.55,
+        opacity: baseOp * initialOrderOpacity,
       });
       const line = new THREE.Line(geo, mat);
+      line.userData.baseOpacity = baseOp;
+      this._orderGroup.add(line);
       if (ord.action !== 'bewegen') {
-        // gestrichelt wirkend: kleine Kugel am Ziel
         const tip = new THREE.Mesh(
           new THREE.SphereGeometry(0.08, 10, 10),
-          new THREE.MeshBasicMaterial({ color: col }),
+          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: baseOp * initialOrderOpacity }),
         );
         tip.position.set(b.x, y, b.y);
-        this._content.add(tip);
+        tip.userData.baseOpacity = baseOp;
+        this._orderGroup.add(tip);
       } else {
         const dir = new THREE.Vector3(b.x - a.x, 0, b.y - a.y).normalize();
         const cone = new THREE.Mesh(
           new THREE.ConeGeometry(0.08, 0.18, 6),
-          new THREE.MeshBasicMaterial({ color: col }),
+          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: baseOp * initialOrderOpacity }),
         );
         cone.position.set(b.x - dir.x * 0.25, y, b.y - dir.z * 0.25);
         cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-        this._content.add(cone);
+        cone.userData.baseOpacity = baseOp;
+        this._orderGroup.add(cone);
       }
-      this._content.add(line);
     }
+    this._orderGroup.visible = initialOrderOpacity > 0.02;
+    this._content.add(this._orderGroup);
 
-    // Einheiten
+    // Einheiten (typunterscheidbare Figuren)
     for (const id of board.order) {
       const u = occ[id];
       if (!u) continue;
@@ -391,20 +463,19 @@ export class Board3DView {
       const col = hexColor(state.players[u.owner].color);
       const sel = o.selection && o.selection.unitId === u.id;
       const mine = o.viewerId === u.owner;
-      const geo = unitGeometry(u.type);
-      const mat = new THREE.MeshStandardMaterial({
-        color: col,
+      const mesh = createFigureMesh(u.type, col, {
         emissive: sel ? 0xffd166 : 0x000000,
         emissiveIntensity: sel ? 0.35 : 0,
-        roughness: 0.45,
-        metalness: 0.2,
       });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(n.x, UNIT_Y * 0.15, n.y);
-      mesh.userData.nodeId = id;
-      this._content.add(mesh);
-      // auch Einheit pickbar
+      const root = new THREE.Group();
+      root.add(mesh);
+      root.position.set(n.x, 0.08, n.y);
+      root.userData.unitId = u.id;
+      root.userData.nodeId = id;
+      this._content.add(root);
+      this._unitRoots.set(u.id, root);
       this._nodeMeshes.set(`${id}__unit`, mesh);
+      mesh.userData.nodeId = id;
 
       if (mine) {
         const halo = new THREE.Mesh(
@@ -414,8 +485,8 @@ export class Board3DView {
           }),
         );
         halo.rotation.x = -Math.PI / 2;
-        halo.position.set(n.x, 0.14, n.y);
-        this._content.add(halo);
+        halo.position.set(0, 0.06, 0);
+        root.add(halo);
       }
 
       if (ordered.has(u.id)) {
@@ -423,20 +494,20 @@ export class Board3DView {
           new THREE.SphereGeometry(0.06, 8, 8),
           new THREE.MeshBasicMaterial({ color: 0xffd166 }),
         );
-        dot.position.set(n.x + 0.22, 0.55, n.y - 0.18);
-        this._content.add(dot);
+        dot.position.set(0.22, 0.55, -0.18);
+        root.add(dot);
       }
 
-      // Typ-Label als Sprite (kurze Buchstaben wie 2D)
       const label = makeTextSprite(TYPE_INFO[u.type].short);
-      label.position.set(n.x, 0.72, n.y);
-      this._content.add(label);
+      label.position.set(0, 0.72, 0);
+      root.add(label);
     }
 
-    // Kamera-Abstand an Brettgroesse
     const span = (board.radius || board.rings) + 1.2;
     this.controls.minDistance = span * 1.4;
     this.controls.maxDistance = span * 4.2;
+
+    if (this._revealFrame) this.applyRevealFrame(this._revealFrame);
   }
 
   _disposeObject(root) {
@@ -487,17 +558,10 @@ export function getBoard3d() {
   return instance;
 }
 
-/** Vor root.innerHTML aufrufen. */
 export function detachBoard3d() {
   if (instance) instance.detach();
 }
 
-/**
- * Nach dem Rendern: Host fuellen.
- * @param {HTMLElement|null} host
- * @param {object} options
- * @param {(nodeId: string) => void} onNodeTap
- */
 export function mountBoard3d(host, options, onNodeTap) {
   if (!host) {
     if (instance) {
@@ -516,4 +580,9 @@ export function disposeBoard3d() {
     instance.dispose();
     instance = null;
   }
+}
+
+/** Reveal-Frame an die aktuelle 3D-Instanz senden (no-op ohne Instanz). */
+export function applyBoard3dReveal(frame) {
+  if (instance) instance.applyRevealFrame(frame);
 }

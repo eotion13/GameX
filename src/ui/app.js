@@ -7,7 +7,9 @@ import { TYPES, TYPE_INFO, PLAYER_NAMES } from '../engine/rules.js';
 import { boardSvg } from './board.js';
 import {
   isView3d, setView3d, detachBoard3d, mountBoard3d, disposeBoard3d,
+  applyBoard3dReveal,
 } from './board3d.js';
+import { createReveal, PHASE } from './reveal.js';
 import { describeEvent, nodeName, winnerText } from './text.js';
 import { rulesHtml } from './rules-text.js';
 import {
@@ -26,6 +28,11 @@ const root = document.getElementById('app');
 
 /** Merkt Brett-Optionen fuer die 3D-Mount-Phase nach root.innerHTML. */
 let pendingBoard3d = null;
+
+/** Aktive Aufdeckungs-Sequenz (Praesentation only). */
+let activeReveal = null;
+let revealKey = null;
+let lastRevealFrame = null;
 
 /**
  * Brett-Inhalt: SVG-Markup oder 3D-Host. Aufrufer umschliesst mit .brett.
@@ -61,7 +68,8 @@ const app = {
   queueIndex: 0,
   working: null,      // Befehle des gerade aktiven Spielers
   selection: null,    // {unitId, mode}
-  lastResult: null,   // {events, orders, before}
+  lastResult: null,   // {events, orders, builds, before, after}
+  revealUi: null,     // {status, phase} - Praesentation
   previousScreen: 'menu',
 
   // Online
@@ -134,8 +142,9 @@ function startRound() {
   app.queueIndex = 0;
   if (app.queue.length === 0) {
     app.working = null;
-    app.screen = 'reveal';
     collectBotOrders();
+    prepareReveal();
+    app.screen = 'reveal';
   } else {
     beginTurn();
   }
@@ -163,6 +172,7 @@ function finishTurn() {
     beginTurn();
   } else {
     collectBotOrders();
+    prepareReveal();
     app.screen = 'reveal';
   }
   save();
@@ -188,15 +198,153 @@ function mergedOrders() {
   return { unitOrders, builds };
 }
 
-function doResolve() {
+/** Resolve einmalig; app.game bleibt before bis finishReveal (Fairness). */
+function prepareReveal() {
+  stopReveal();
   const before = app.game;
   const merged = mergedOrders();
   const res = resolve(before, merged);
-  app.lastResult = { events: res.events, orders: merged.unitOrders, before };
-  app.game = res.state;
+  app.lastResult = {
+    events: res.events,
+    orders: merged.unitOrders,
+    builds: merged.builds,
+    before,
+    after: res.state,
+  };
+  app.revealUi = { status: isView3d() ? 'ready' : 'done', phase: null };
+}
+
+function revealPayload() {
+  if (app.screen === 'online-reveal' && app.ansicht) {
+    const v = verlaufEintrag(app.ansicht.runde);
+    if (!v) return null;
+    return {
+      before: v.before,
+      orders: v.orders,
+      builds: v.builds,
+      events: v.events,
+      after: zustandNach(v.runde),
+    };
+  }
+  return app.lastResult;
+}
+
+function stopReveal() {
+  if (activeReveal) {
+    try { activeReveal.skip(); } catch (_) { /* bereits done */ }
+  }
+  activeReveal = null;
+  revealKey = null;
+  lastRevealFrame = null;
+}
+
+function finishReveal() {
+  stopReveal();
+  if (app.online) {
+    app.ansicht.stufe = 'ergebnis';
+    app.screen = 'online-result';
+    app.revealUi = null;
+    render();
+    return;
+  }
+  if (app.lastResult?.after) app.game = app.lastResult.after;
+  app.revealUi = null;
   app.screen = 'result';
   save();
   render();
+}
+
+function revealChromeHtml() {
+  const ui = app.revealUi || { status: 'done' };
+  const view3d = isView3d();
+  const phaseHint = {
+    [PHASE.ORDERS]: 'Befehle werden aufgedeckt…',
+    [PHASE.MOVES]: 'Züge gleichzeitig…',
+    [PHASE.EFFECTS]: 'Kämpfe & Bau…',
+    [PHASE.DONE]: 'Aufdeckung fertig.',
+  }[ui.phase] || (view3d ? 'Aufdeckung…' : 'Alle Befehle offen');
+
+  if (!view3d || ui.status === 'done') {
+    return `
+      <div class="panel-kopf"><strong>${ui.status === 'done' && view3d ? 'Aufdeckung fertig' : 'Alle Befehle offen'}</strong></div>
+      <p class="hinweis">${view3d ? phaseHint : 'Durchgezogen = Bewegung, gestrichelt = Unterstützung.'}</p>`;
+  }
+  return `
+    <div class="panel-kopf"><strong>Gleichzeitige Aufdeckung</strong>
+      <span class="badge">${esc(phaseHint)}</span>
+    </div>
+    <div class="knopfreihe">
+      ${ui.status === 'paused'
+    ? '<button data-action="reveal-resume">Fortsetzen</button>'
+    : '<button data-action="reveal-pause">Pause</button>'}
+      <button data-action="reveal-skip">Überspringen</button>
+    </div>
+    <p class="hinweis">Timing ändert den Spielstand nicht. Überspringen springt zum Ergebnis.</p>`;
+}
+
+function updateRevealChrome() {
+  const el = root.querySelector('[data-reveal-chrome]');
+  if (el) el.innerHTML = revealChromeHtml();
+  const actions = root.querySelector('[data-reveal-actions]');
+  if (actions) actions.innerHTML = revealActionsHtml();
+}
+
+function revealActionsHtml() {
+  const ui = app.revealUi || { status: 'done' };
+  const online = app.screen === 'online-reveal';
+  const done = !isView3d() || ui.status === 'done';
+  if (!done) {
+    return `
+      <button class="neben" data-action="reveal-skip">Überspringen</button>`;
+  }
+  return `
+    <button class="haupt" data-action="${online ? 'online-ergebnis' : 'reveal-weiter'}">
+      ${online ? 'Ergebnis' : 'Weiter zur Auswertung'}
+    </button>`;
+}
+
+function maybeStartReveal() {
+  const payload = revealPayload();
+  if (!payload?.before || !payload.after) return;
+
+  if (!isView3d()) {
+    app.revealUi = { status: 'done', phase: PHASE.DONE };
+    return;
+  }
+
+  const key = app.online
+    ? `online-${app.ansicht?.runde}`
+    : `off-${payload.before.round}-${payload.events?.length || 0}`;
+
+  if (activeReveal && revealKey === key) {
+    if (lastRevealFrame) applyBoard3dReveal(lastRevealFrame);
+    return;
+  }
+
+  stopReveal();
+  revealKey = key;
+  app.revealUi = { status: 'playing', phase: PHASE.ORDERS };
+  activeReveal = createReveal(payload, {
+    onUpdate(frame) {
+      lastRevealFrame = frame;
+      applyBoard3dReveal(frame);
+      const prevPhase = app.revealUi?.phase;
+      const prevStatus = app.revealUi?.status;
+      app.revealUi = { status: activeReveal?.status || frame.status, phase: frame.phase };
+      if (frame.phase !== prevPhase || frame.status !== prevStatus) updateRevealChrome();
+    },
+  });
+  updateRevealChrome();
+  activeReveal.start().then(() => {
+    if (revealKey !== key) return;
+    app.revealUi = { status: 'done', phase: PHASE.DONE };
+    updateRevealChrome();
+  });
+}
+
+/** @deprecated resolve passiert in prepareReveal; bleibt als Alias fuer Klarheit. */
+function doResolve() {
+  finishReveal();
 }
 
 function nextRound() {
@@ -448,11 +596,30 @@ const actions = {
     render();
   },
   'befehle-fertig': () => finishTurn(),
-  'auswerten': () => doResolve(),
+  'auswerten': () => finishReveal(),
+  'reveal-weiter': () => finishReveal(),
+  'reveal-pause': () => {
+    activeReveal?.pause();
+    app.revealUi = { ...(app.revealUi || {}), status: 'paused' };
+    updateRevealChrome();
+  },
+  'reveal-resume': () => {
+    activeReveal?.resume();
+    app.revealUi = { ...(app.revealUi || {}), status: 'playing' };
+    updateRevealChrome();
+  },
+  'reveal-skip': () => {
+    if (activeReveal && activeReveal.status !== 'done') activeReveal.skip();
+    else {
+      app.revealUi = { status: 'done', phase: PHASE.DONE };
+      updateRevealChrome();
+    }
+  },
   'weiter': () => nextRound(),
   'aufgeben': () => {
     if (app.online) { actions['online-verlassen'](); return; }
     if (confirm('Partie wirklich beenden?')) {
+      stopReveal();
       app.game = null;
       app.screen = 'menu';
       localStorage.removeItem(SAVE_KEY);
@@ -545,7 +712,13 @@ const actions = {
     await app.online.uebernimmBot(Number(d.seat));
   }),
 
-  'online-ergebnis': () => { app.ansicht.stufe = 'ergebnis'; app.screen = 'online-result'; render(); },
+  'online-ergebnis': () => {
+    stopReveal();
+    app.ansicht.stufe = 'ergebnis';
+    app.screen = 'online-result';
+    app.revealUi = null;
+    render();
+  },
   'online-weiter': () => {
     app.gesehenBis = app.ansicht.runde;
     app.ansicht = null;
@@ -637,6 +810,11 @@ function render() {
     mountBoard3d(host, pendingBoard3d, handleNodeTap);
   } else {
     disposeBoard3d();
+  }
+  if (app.screen === 'reveal' || app.screen === 'online-reveal') {
+    maybeStartReveal();
+  } else if (activeReveal) {
+    stopReveal();
   }
 }
 
@@ -810,22 +988,33 @@ function viewOrders() {
 }
 
 function viewReveal(g, merged, onlineModus = false) {
-  const board = brettContent({ state: g, orders: merged.unitOrders, showOrdersOf: 'alle', viewerId: null });
-  const buildRows = g.players
-    .filter((p) => merged.builds[p.id])
-    .map((p) => `<li><span class="punkt" style="background:${p.color}"></span>${esc(p.name)} baut ${TYPE_INFO[merged.builds[p.id]].name}</li>`)
+  // Offline: g ist before (app.game noch unveraendert). Online: v.before.
+  const payload = onlineModus ? revealPayload() : app.lastResult;
+  const before = payload?.before || g;
+  const orders = payload?.orders || merged.unitOrders || {};
+  const animate = isView3d() && (app.revealUi?.status !== 'done');
+  const board = brettContent({
+    state: before,
+    orders,
+    showOrdersOf: 'alle',
+    viewerId: null,
+    animateOrders: animate,
+  });
+  const buildSrc = payload?.builds || merged.builds || {};
+  const buildRows = before.players
+    .filter((p) => buildSrc[p.id])
+    .map((p) => `<li><span class="punkt" style="background:${p.color}"></span>${esc(p.name)} baut ${TYPE_INFO[buildSrc[p.id]].name}</li>`)
     .join('');
   return `
   <div class="seite spiel">
-    ${statusBar(g, null)}
+    ${statusBar(before, null)}
     <div class="brett${isView3d() ? ' brett-3d' : ''}">${board}</div>
     <div class="panel">
-      <div class="panel-kopf"><strong>Alle Befehle offen</strong></div>
-      <p class="hinweis">Durchgezogen = Bewegung, gestrichelt = Unterstützung.</p>
+      <div data-reveal-chrome>${revealChromeHtml()}</div>
       ${buildRows ? `<ul class="liste">${buildRows}</ul>` : ''}
     </div>
-    <div class="aktionen fix">
-      <button class="haupt" data-action="${onlineModus ? 'online-ergebnis' : 'auswerten'}">Auswerten</button>
+    <div class="aktionen fix" data-reveal-actions>
+      ${revealActionsHtml()}
     </div>
   </div>`;
 }
