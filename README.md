@@ -108,6 +108,8 @@ Die 3D-Ansicht ist reine Präsentation über derselben Engine: Menü **Ansicht �
 oder URL `?view=3d`. Ohne Flag bleibt das SVG-Brett (Three.js wird dann nicht geladen).
 Nach dem Zugbefehl startet in 3D die Aufdeckungs-Sequenz (Pause/Überspringen);
 Timing ändert keinen Spielstand. Online nutzt dieselbe View inkl. Warten-Overlay.
+**Replay** zeigt vergangene Runden aus dem Verlauf erneut (Spectator/Hotseat), ohne
+den aktuellen Spielstand zu verändern.
 
 Der Kern ist eine reine Funktion:
 

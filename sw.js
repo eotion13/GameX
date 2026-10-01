@@ -1,5 +1,5 @@
 // Offline-Cache. Bei jeder Aenderung VERSION erhoehen.
-const VERSION = 'knotenpunkt-v9';
+const VERSION = 'knotenpunkt-v10';
 const DATEIEN = [
   './', './index.html', './manifest.webmanifest',
   './css/app.css',
@@ -10,11 +10,17 @@ const DATEIEN = [
   './src/engine/resolver.js', './src/engine/bots.js',
   './src/net/room.js', './src/net/online.js', './src/net/config.js', './src/net/firebase.js',
   './vendor/three/three.module.min.js', './vendor/three/OrbitControls.js',
-  './icons/icon.svg',
+  './vendor/three/NOTICE.md',
+  './icons/icon.svg', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(DATEIEN)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(VERSION)
+      .then((c) => c.addAll(DATEIEN))
+      .then(() => self.skipWaiting())
+      .catch(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener('activate', (e) => {
@@ -23,14 +29,32 @@ self.addEventListener('activate', (e) => {
     .then(() => self.clients.claim()));
 });
 
-// Netz zuerst, Cache als Rueckfall - so ist die App offline spielbar,
-// bekommt aber online immer die aktuelle Fassung.
-// Fremde Server (Firebase) gehen unangetastet durch. Sonst bekaeme ein
-// Datenbankaufruf bei Funkloch die Startseite als Antwort und das Spiel
-// haelte das faelschlich fuer "noch keine Befehle da".
+function istVendor(url) {
+  return url.pathname.includes('/vendor/');
+}
+
+// Vendor (Three.js-Pin): Cache zuerst — unveraenderliche Assets.
+// App-Code: Netz zuerst, Cache als Rueckfall.
+// Fremde Server (Firebase) unangetastet.
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
-  if (new URL(e.request.url).origin !== self.location.origin) return;
+  const url = new URL(e.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  if (istVendor(url)) {
+    e.respondWith(
+      caches.match(e.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(e.request).then((res) => {
+          const copy = res.clone();
+          caches.open(VERSION).then((c) => c.put(e.request, copy)).catch(() => {});
+          return res;
+        });
+      }).catch(() => caches.match('./index.html')),
+    );
+    return;
+  }
+
   e.respondWith(
     fetch(e.request)
       .then((res) => {
@@ -38,6 +62,6 @@ self.addEventListener('fetch', (e) => {
         caches.open(VERSION).then((c) => c.put(e.request, copy)).catch(() => {});
         return res;
       })
-      .catch(() => caches.match(e.request).then((r) => r || caches.match('./index.html')))
+      .catch(() => caches.match(e.request).then((r) => r || caches.match('./index.html'))),
   );
 });

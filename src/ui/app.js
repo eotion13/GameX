@@ -94,13 +94,15 @@ const app = {
   selection: null,    // {unitId, mode}
   lastResult: null,   // {events, orders, builds, before, after}
   revealUi: null,     // {status, phase} - Praesentation
+  verlauf: [],        // Offline-Archiv fuer Replay (keine Regelwirkung)
+  replay: null,       // {runde} wenn eine alte Runde nachgespielt wird
   previousScreen: 'menu',
 
   // Online
   online: null,       // OnlineSitzung, solange eine Netzpartie laeuft
   onlineForm: { name: '', code: '', fehler: null, entwurf: '', laedt: false, kopiert: false },
   gesehenBis: 0,      // bis zu dieser Runde wurde die Auswertung schon angeschaut
-  ansicht: null,      // {runde, stufe:'reveal'|'ergebnis'} beim Nachschauen
+  ansicht: null,      // {runde, stufe:'reveal'|'ergebnis', replay?} beim Nachschauen
   wartenSeit: 0,
 };
 
@@ -112,7 +114,7 @@ function save() {
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       game: app.game, pending: app.pending, queue: app.queue,
       queueIndex: app.queueIndex, working: app.working, screen: app.screen,
-      lastResult: app.lastResult, setup: app.setup,
+      lastResult: app.lastResult, setup: app.setup, verlauf: app.verlauf,
     }));
   } catch (_) { /* privater Modus: dann eben ohne Speichern */ }
 }
@@ -132,9 +134,15 @@ function resume() {
     queueIndex: d.queueIndex || 0, working: d.working || null,
     screen: d.screen || 'orders', lastResult: d.lastResult || null,
     setup: d.setup || app.setup, selection: null,
+    verlauf: Array.isArray(d.verlauf) ? d.verlauf : [],
+    replay: null,
   });
   if (app.screen === 'menu') app.screen = 'orders';
   return true;
+}
+
+function cloneJson(x) {
+  return JSON.parse(JSON.stringify(x));
 }
 
 // ------------------------------------------------------------- Spielablauf
@@ -156,6 +164,8 @@ function newGame() {
   app.game.botSeed = Math.floor(Math.random() * 1e9);
   app.pending = {};
   app.lastResult = null;
+  app.verlauf = [];
+  app.replay = null;
   startRound();
 }
 
@@ -235,11 +245,32 @@ function prepareReveal() {
     before,
     after: res.state,
   };
+  // Archiv nur fuer Replay/Spectator-Praesentation
+  app.verlauf.push({
+    runde: before.round,
+    before: cloneJson(before),
+    orders: cloneJson(merged.unitOrders),
+    builds: cloneJson(merged.builds),
+    events: cloneJson(res.events),
+    after: cloneJson(res.state),
+  });
   app.revealUi = { status: isView3d() ? 'ready' : 'done', phase: null };
 }
 
+function offlineVerlaufEintrag(runde) {
+  return (app.verlauf || []).find((v) => v.runde === Number(runde)) || null;
+}
+
 function revealPayload() {
-  if (app.screen === 'online-reveal' && app.ansicht) {
+  if (app.screen === 'replay-reveal' && app.replay) {
+    const v = offlineVerlaufEintrag(app.replay.runde);
+    if (!v) return null;
+    return {
+      before: v.before, orders: v.orders, builds: v.builds,
+      events: v.events, after: v.after,
+    };
+  }
+  if ((app.screen === 'online-reveal' || app.screen === 'online-result') && app.ansicht) {
     const v = verlaufEintrag(app.ansicht.runde);
     if (!v) return null;
     return {
@@ -264,8 +295,14 @@ function stopReveal() {
 
 function finishReveal() {
   stopReveal();
+  if (app.screen === 'replay-reveal' || app.replay) {
+    app.screen = 'replay-result';
+    app.revealUi = null;
+    render();
+    return;
+  }
   if (app.online) {
-    app.ansicht.stufe = 'ergebnis';
+    if (app.ansicht) app.ansicht.stufe = 'ergebnis';
     app.screen = 'online-result';
     app.revealUi = null;
     render();
@@ -316,14 +353,20 @@ function updateRevealChrome() {
 function revealActionsHtml() {
   const ui = app.revealUi || { status: 'done' };
   const online = app.screen === 'online-reveal';
+  const replay = app.screen === 'replay-reveal' || !!app.ansicht?.replay;
   const done = !isView3d() || ui.status === 'done';
   if (!done) {
     return `
       <button class="neben" data-action="reveal-skip">Überspringen</button>`;
   }
+  if (app.screen === 'replay-reveal') {
+    return `
+      <button class="haupt" data-action="auswerten">Weiter zur Auswertung</button>
+      <button class="neben klein" data-action="replay-liste">Alle Runden</button>`;
+  }
   return `
     <button class="haupt" data-action="${online ? 'online-ergebnis' : 'auswerten'}">
-      ${online ? 'Ergebnis' : 'Weiter zur Auswertung'}
+      ${online ? (replay ? 'Ergebnis (Replay)' : 'Ergebnis') : 'Weiter zur Auswertung'}
     </button>`;
 }
 
@@ -337,8 +380,10 @@ function maybeStartReveal() {
   }
 
   const key = app.online
-    ? `online-${app.ansicht?.runde}`
-    : `off-${payload.before.round}-${payload.events?.length || 0}`;
+    ? `online-${app.ansicht?.runde}-${app.ansicht?.replay ? 'rp' : 'live'}`
+    : app.replay
+      ? `replay-${app.replay.runde}`
+      : `off-${payload.before.round}-${payload.events?.length || 0}`;
 
   if (activeReveal && revealKey === key) {
     if (lastRevealFrame && board3dMod?.getBoard3d?.()) {
@@ -741,12 +786,19 @@ const actions = {
 
   'online-ergebnis': () => {
     stopReveal();
-    app.ansicht.stufe = 'ergebnis';
+    if (app.ansicht) app.ansicht.stufe = 'ergebnis';
     app.screen = 'online-result';
     app.revealUi = null;
     render();
   },
   'online-weiter': () => {
+    if (app.ansicht?.replay) {
+      app.ansicht = null;
+      app.previousScreen = app.previousScreen || 'warten';
+      app.screen = 'replay-liste-online';
+      render();
+      return;
+    }
     app.gesehenBis = app.ansicht.runde;
     app.ansicht = null;
     waehleOnlineBildschirm();
@@ -755,6 +807,59 @@ const actions = {
 
   'online-verlassen': () => {
     if (confirm('Raum verlassen? Die Partie läuft ohne dich weiter.')) verlasseOnline();
+  },
+
+  'replay-liste': () => {
+    stopReveal();
+    app.replay = null;
+    app.revealUi = null;
+    app.previousScreen = app.screen === 'gameover' ? 'gameover'
+      : (app.online ? (app.screen || 'warten') : (app.game?.phase === 'finished' ? 'gameover' : 'result'));
+    app.screen = app.online ? 'replay-liste-online' : 'replay-liste';
+    render();
+  },
+  'replay-runde': (d) => {
+    const runde = Number(d.runde);
+    stopReveal();
+    if (app.online) {
+      app.ansicht = { runde, stufe: 'reveal', replay: true };
+      app.revealUi = { status: isView3d() ? 'ready' : 'done', phase: null };
+      app.screen = 'online-reveal';
+    } else {
+      app.replay = { runde };
+      app.revealUi = { status: isView3d() ? 'ready' : 'done', phase: null };
+      app.screen = 'replay-reveal';
+    }
+    render();
+  },
+  'replay-wiederholen': () => {
+    if (!app.lastResult) return;
+    stopReveal();
+    app.replay = { runde: app.lastResult.before.round };
+    app.revealUi = { status: isView3d() ? 'ready' : 'done', phase: null };
+    app.screen = 'replay-reveal';
+    render();
+  },
+  'replay-zurueck': () => {
+    stopReveal();
+    app.replay = null;
+    app.ansicht = null;
+    app.revealUi = null;
+    if (app.online) {
+      waehleOnlineBildschirm();
+    } else if (app.game?.phase === 'finished') {
+      app.screen = 'gameover';
+    } else if (app.lastResult) {
+      app.screen = 'result';
+    } else {
+      app.screen = app.previousScreen || 'menu';
+    }
+    render();
+  },
+  'replay-result-fertig': () => {
+    app.replay = null;
+    app.screen = 'replay-liste';
+    render();
   },
 };
 
@@ -791,6 +896,21 @@ function render() {
     result: () => viewResult(app.game, app.lastResult),
     gameover: viewGameOver,
     regeln: viewRules,
+    'replay-liste': () => viewReplayListe(false),
+    'replay-liste-online': () => viewReplayListe(true),
+    'replay-reveal': () => {
+      const v = offlineVerlaufEintrag(app.replay?.runde);
+      return viewReveal(v?.before || app.game, {
+        unitOrders: v?.orders || {}, builds: v?.builds || {},
+      }, false);
+    },
+    'replay-result': () => {
+      const v = offlineVerlaufEintrag(app.replay?.runde);
+      if (!v) return viewReplayListe(false);
+      return viewResult(v.after, {
+        events: v.events, orders: v.orders, before: v.before,
+      }, false, true);
+    },
 
     verbinden: () => viewVerbinden({ text: f.fehler || 'Verbinde…' }),
     online: () => viewOnlineStart({
@@ -816,12 +936,14 @@ function render() {
       }),
       wartetSeit: app.wartenSeit ? Date.now() - app.wartenSeit : 0,
       view3d: isView3d(),
+      kannReplay: (app.online.verlauf || []).length > 0,
     }),
     'online-bot': () => viewOnlineBot({
       sitzung: app.online,
       statusHtml: statusBar(app.game, app.online.sitz),
       brettHtml: brettContent({ state: app.game, orders: {}, viewerId: app.online.sitz, showOrdersOf: null }),
       view3d: isView3d(),
+      kannReplay: (app.online.verlauf || []).length > 0,
     }),
     'online-reveal': () => {
       const v = verlaufEintrag(app.ansicht.runde);
@@ -835,7 +957,9 @@ function render() {
   root.innerHTML = html ? html() : viewMenu();
   root.scrollTop = 0;
 
-  const needReveal = app.screen === 'reveal' || app.screen === 'online-reveal';
+  const needReveal = app.screen === 'reveal'
+    || app.screen === 'online-reveal'
+    || app.screen === 'replay-reveal';
 
   if (pendingBoard3d) {
     const host = root.querySelector('[data-board3d]');
@@ -1035,8 +1159,10 @@ function viewOrders() {
 }
 
 function viewReveal(g, merged, onlineModus = false) {
-  // Offline: g ist before (app.game noch unveraendert). Online: v.before.
-  const payload = onlineModus ? revealPayload() : app.lastResult;
+  // Offline: g ist before (app.game noch unveraendert). Online/Replay: aus Payload.
+  const payload = (onlineModus || app.screen === 'replay-reveal')
+    ? revealPayload()
+    : app.lastResult;
   const before = payload?.before || g;
   const orders = payload?.orders || merged.unitOrders || {};
   const animate = isView3d() && (app.revealUi?.status !== 'done');
@@ -1052,12 +1178,15 @@ function viewReveal(g, merged, onlineModus = false) {
     .filter((p) => buildSrc[p.id])
     .map((p) => `<li><span class="punkt" style="background:${p.color}"></span>${esc(p.name)} baut ${TYPE_INFO[buildSrc[p.id]].name}</li>`)
     .join('');
+  const replayBadge = (app.screen === 'replay-reveal' || app.ansicht?.replay)
+    ? '<span class="badge">Replay</span>' : '';
   return `
   <div class="seite spiel">
     ${statusBar(before, null)}
     <div class="brett${isView3d() ? ' brett-3d' : ''}">${board}</div>
     <div class="panel">
       <div data-reveal-chrome>${revealChromeHtml()}</div>
+      ${replayBadge ? `<p class="hinweis">Nur Ansicht — der Spielstand bleibt unverändert. ${replayBadge}</p>` : ''}
       ${buildRows ? `<ul class="liste">${buildRows}</ul>` : ''}
     </div>
     <div class="aktionen fix" data-reveal-actions>
@@ -1066,22 +1195,60 @@ function viewReveal(g, merged, onlineModus = false) {
   </div>`;
 }
 
-function viewResult(g, r, onlineModus = false) {
+function viewResult(g, r, onlineModus = false, replayModus = false) {
   const board = brettContent({ state: g, orders: {}, viewerId: null, showOrdersOf: null });
   const items = r.events.map((e) => describeEvent(r.before, e)).filter(Boolean);
   const list = items.length
     ? items.map((i) => `<li><span class="ikon" style="color:${i.owner !== undefined && g.players[i.owner] ? g.players[i.owner].color : 'inherit'}">${i.icon}</span> ${esc(i.text)}</li>`).join('')
     : '<li class="leer">Nichts hat sich bewegt.</li>';
+  const haupt = replayModus
+    ? 'replay-result-fertig'
+    : (onlineModus ? 'online-weiter' : 'weiter');
+  const hauptText = replayModus
+    ? 'Zurück zur Liste'
+    : (g.phase === 'finished' ? 'Ergebnis' : (onlineModus && app.ansicht?.replay ? 'Zurück' : 'Nächste Runde'));
   return `
   <div class="seite spiel">
     ${statusBar(g, null)}
     <div class="brett${isView3d() ? ' brett-3d' : ''}">${board}</div>
     <div class="panel scroll">
-      <div class="panel-kopf"><strong>Auswertung Runde ${r.before.round}</strong></div>
+      <div class="panel-kopf"><strong>Auswertung Runde ${r.before.round}</strong>
+        ${replayModus || app.ansicht?.replay ? '<span class="badge">Replay</span>' : ''}
+      </div>
       <ul class="liste">${list}</ul>
     </div>
     <div class="aktionen fix">
-      <button class="haupt" data-action="${onlineModus ? 'online-weiter' : 'weiter'}">${g.phase === 'finished' ? 'Ergebnis' : 'Nächste Runde'}</button>
+      <button class="haupt" data-action="${haupt}">${hauptText}</button>
+      ${!replayModus && !onlineModus && app.verlauf?.length
+    ? '<button class="neben klein" data-action="replay-wiederholen">Aufdeckung wiederholen</button>' : ''}
+      ${!replayModus && !onlineModus && app.verlauf?.length > 1
+    ? '<button class="neben klein" data-action="replay-liste">Alle Runden</button>' : ''}
+    </div>
+  </div>`;
+}
+
+function viewReplayListe(online) {
+  // Online: verlauf ist oeffentlich sobald die Runde gefaltet wurde (Spectator/Replay).
+  // Offline: lokales Archiv aus prepareReveal.
+  const rowsSrc = online ? (app.online?.verlauf || []) : (app.verlauf || []);
+  const rows = [...rowsSrc].sort((a, b) => a.runde - b.runde).map((v) => `
+    <button class="replay-zeile" data-action="replay-runde" data-runde="${v.runde}">
+      <span class="replay-nr">Runde ${v.runde}</span>
+      <span class="replay-meta">${(v.events || []).length} Ereignisse</span>
+      <span class="replay-go">Ansehen</span>
+    </button>`).join('');
+
+  return `
+  <div class="seite">
+    <header class="titel">
+      <h1>Replay</h1>
+      <p>Vergangene Runden nochmal ansehen — ohne den Spielstand zu ändern.</p>
+    </header>
+    <div class="karte replay-liste">
+      ${rows || '<p class="hinweis">Noch keine abgeschlossenen Runden.</p>'}
+    </div>
+    <div class="aktionen">
+      <button class="haupt" data-action="replay-zurueck">Zurück</button>
     </div>
   </div>`;
 }
@@ -1109,6 +1276,8 @@ function viewGameOver() {
     <ul class="rangliste">${rows}</ul>
     <div class="aktionen">
       <button class="haupt" data-action="neues-spiel">Neue Partie</button>
+      ${(app.verlauf?.length || app.online?.verlauf?.length)
+    ? '<button class="neben" data-action="replay-liste">Replay</button>' : ''}
       <button class="neben" data-action="regeln">Regeln</button>
     </div>
   </div>`;

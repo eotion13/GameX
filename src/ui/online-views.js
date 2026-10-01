@@ -251,7 +251,7 @@ export function viewLobby({ sitzung, link, teams, kopiert, fehler }) {
 
 // ------------------------------------------------------------------- Warten
 
-export function viewWarten({ sitzung, statusHtml, brettHtml, wartetSeit, view3d = false }) {
+export function viewWarten({ sitzung, statusHtml, brettHtml, wartetSeit, view3d = false, kannReplay = false }) {
   const sitze = sitzeArray(sitzung.raum);
   const fehlende = sitzung.fehlende
     .filter((seat) => seat !== sitzung.sitz)
@@ -302,6 +302,7 @@ export function viewWarten({ sitzung, statusHtml, brettHtml, wartetSeit, view3d 
       ${sitzung.fehler ? fehlerBox(sitzung.fehler) : ''}
     </div>
     <div class="aktionen fix">
+      ${kannReplay ? '<button class="neben klein" data-action="replay-liste">Replay</button>' : ''}
       <button class="neben klein" data-action="regeln">Regeln</button>
       <button class="neben klein" data-action="online-verlassen">Verlassen</button>
     </div>
@@ -310,12 +311,12 @@ export function viewWarten({ sitzung, statusHtml, brettHtml, wartetSeit, view3d 
 
 // ------------------------------------------------------------------ Zuschauen
 
-export function viewOnlineBot({ sitzung, statusHtml, brettHtml, view3d = false }) {
+export function viewOnlineBot({ sitzung, statusHtml, brettHtml, view3d = false, kannReplay = false }) {
   const overlay = view3d ? `
     <div class="warten-overlay" aria-live="polite">
       <div class="warten-overlay-inner">
         <strong>Zuschauer</strong>
-        <p class="warten-overlay-sub">Dein Platz spielt ein Bot.</p>
+        <p class="warten-overlay-sub">Dein Platz spielt ein Bot. Du siehst denselben Stand wie alle.</p>
       </div>
     </div>` : '';
   return `
@@ -326,10 +327,11 @@ export function viewOnlineBot({ sitzung, statusHtml, brettHtml, view3d = false }
       ${overlay}
     </div>
     <div class="panel">
-      <div class="panel-kopf"><strong>Dein Platz wird von einem Bot gespielt</strong></div>
-      <p class="hinweis">Du kannst zuschauen, wie die Partie zu Ende geht.</p>
+      <div class="panel-kopf"><strong>Zuschauer-Modus</strong><span class="badge">Bot spielt</span></div>
+      <p class="hinweis">Dein Platz wird von einem Bot gespielt. Du kannst zuschauen und vergangene Runden als Replay ansehen — ohne Extra-Informationen.</p>
     </div>
     <div class="aktionen fix">
+      ${kannReplay ? '<button class="neben" data-action="replay-liste">Replay</button>' : ''}
       <button class="neben klein" data-action="online-verlassen">Verlassen</button>
     </div>
   </div>`;

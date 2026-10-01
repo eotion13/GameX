@@ -54,22 +54,36 @@ export class Board3DView {
       e.cause = err;
       throw e;
     }
-    this.renderer.setClearColor(0x0f1420, 0);
+    this.renderer.setClearColor(0x0a0e18, 0);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x0a0e18);
+    this.scene.fog = new THREE.Fog(0x0a0e18, 14, 32);
     this.scene.add(this._content);
 
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 80);
     this.camera.position.set(0, 9, 7.5);
     this.camera.lookAt(0, 0, 0);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.72);
-    const key = new THREE.DirectionalLight(0xfff2d6, 0.85);
-    key.position.set(4, 10, 3);
-    const fill = new THREE.DirectionalLight(0xa8c0ff, 0.28);
-    fill.position.set(-5, 4, -3);
-    this.scene.add(ambient, key, fill);
+    // Weiches Environment: Hemisphaere + Key + kühler Rim (eine Key-Light, mobilfreundlich)
+    const hemi = new THREE.HemisphereLight(0xc5d4f0, 0x1c1812, 0.55);
+    const key = new THREE.DirectionalLight(0xfff2d6, 0.9);
+    key.position.set(5, 12, 4);
+    const rim = new THREE.DirectionalLight(0x7a9cff, 0.28);
+    rim.position.set(-6, 4, -5);
+    this.scene.add(hemi, key, rim);
+
+    // Dezente Boden-Aura (kein Shadow-Map — Leistungsbudget)
+    const glow = new THREE.Mesh(
+      new THREE.CircleGeometry(8, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0x1a2740, transparent: true, opacity: 0.35, depthWrite: false,
+      }),
+    );
+    glow.rotation.x = -Math.PI / 2;
+    glow.position.y = -0.06;
+    this.scene.add(glow);
 
     this.controls = new OrbitControls(this.camera, this.canvas);
     this.controls.enableDamping = true;
@@ -290,7 +304,8 @@ export class Board3DView {
     const floor = new THREE.Mesh(
       new THREE.CircleGeometry((board.radius || board.rings) + 1.4, 48),
       new THREE.MeshStandardMaterial({
-        color: 0x121826, roughness: 0.92, metalness: 0.05,
+        color: 0x141b2a, roughness: 0.88, metalness: 0.08,
+        emissive: 0x0a1220, emissiveIntensity: 0.25,
       }),
     );
     floor.rotation.x = -Math.PI / 2;
