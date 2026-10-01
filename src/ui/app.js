@@ -5,6 +5,9 @@ import { resolve } from '../engine/resolver.js';
 import { botOrders, mulberry32 } from '../engine/bots.js';
 import { TYPES, TYPE_INFO, PLAYER_NAMES } from '../engine/rules.js';
 import { boardSvg } from './board.js';
+import {
+  isView3d, setView3d, detachBoard3d, mountBoard3d, disposeBoard3d,
+} from './board3d.js';
 import { describeEvent, nodeName, winnerText } from './text.js';
 import { rulesHtml } from './rules-text.js';
 import {
@@ -20,6 +23,23 @@ import { normalisiereCode } from '../net/room.js';
 const SAVE_KEY = 'knotenpunkt.spielstand.v2';
 const ONLINE_KEY = 'knotenpunkt.online.v1';
 const root = document.getElementById('app');
+
+/** Merkt Brett-Optionen fuer die 3D-Mount-Phase nach root.innerHTML. */
+let pendingBoard3d = null;
+
+/**
+ * Brett-Inhalt: SVG-Markup oder 3D-Host. Aufrufer umschliesst mit .brett.
+ * Gleiche Order-API wie boardSvg; Engine unberuehrt.
+ * @param {object} options  Argumente wie bei boardSvg(...)
+ */
+function brettContent(options) {
+  if (isView3d()) {
+    pendingBoard3d = options;
+    return '<div class="brett-3d-host" data-board3d="1"></div>';
+  }
+  pendingBoard3d = null;
+  return boardSvg(options);
+}
 
 const app = {
   screen: 'menu',
@@ -439,6 +459,21 @@ const actions = {
       render();
     }
   },
+  'view-3d': () => {
+    setView3d(true);
+    const url = new URL(location.href);
+    url.searchParams.set('view', '3d');
+    history.replaceState(null, '', url);
+    render();
+  },
+  'view-2d': () => {
+    setView3d(false);
+    const url = new URL(location.href);
+    url.searchParams.delete('view');
+    history.replaceState(null, '', url);
+    disposeBoard3d();
+    render();
+  },
 
   // ------------------------------------------------------------------ Online
   'online': () => { app.onlineForm.fehler = null; app.screen = 'online'; render(); },
@@ -545,6 +580,9 @@ root.addEventListener('input', (ev) => {
 // ------------------------------------------------------------------ Rendern
 function render() {
   const f = app.onlineForm;
+  pendingBoard3d = null;
+  // WebGL-Canvas vor dem DOM-Wipe sichern
+  detachBoard3d();
   const html = {
     menu: viewMenu,
     pass: viewPass,
@@ -572,7 +610,7 @@ function render() {
     warten: () => viewWarten({
       sitzung: app.online,
       statusHtml: statusBar(app.game, app.online.sitz),
-      brettHtml: boardSvg({
+      brettHtml: brettContent({
         state: app.game, orders: app.working?.unitOrders || {},
         viewerId: app.online.sitz, showOrdersOf: app.online.sitz,
       }),
@@ -581,7 +619,7 @@ function render() {
     'online-bot': () => viewOnlineBot({
       sitzung: app.online,
       statusHtml: statusBar(app.game, app.online.sitz),
-      brettHtml: boardSvg({ state: app.game, orders: {}, viewerId: app.online.sitz, showOrdersOf: null }),
+      brettHtml: brettContent({ state: app.game, orders: {}, viewerId: app.online.sitz, showOrdersOf: null }),
     }),
     'online-reveal': () => {
       const v = verlaufEintrag(app.ansicht.runde);
@@ -594,6 +632,12 @@ function render() {
   }[app.screen];
   root.innerHTML = html ? html() : viewMenu();
   root.scrollTop = 0;
+  if (pendingBoard3d) {
+    const host = root.querySelector('[data-board3d]');
+    mountBoard3d(host, pendingBoard3d, handleNodeTap);
+  } else {
+    disposeBoard3d();
+  }
 }
 
 function esc(s) {
@@ -603,6 +647,7 @@ function esc(s) {
 function viewMenu() {
   const s = app.setup;
   const hasSave = !!loadSaved();
+  const view3d = isView3d();
   const counts = [2, 3, 4, 5, 6].map((n) => `
     <button class="chip ${s.playerCount === n ? 'aktiv' : ''}" data-action="spielerzahl" data-wert="${n}">${n}</button>`).join('');
   const seats = s.seats.slice(0, s.playerCount).map((seat, i) => `
@@ -636,6 +681,11 @@ function viewMenu() {
       </div>` : ''}
       <h2>Plätze</h2>
       ${seats}
+      <h2>Ansicht</h2>
+      <div class="segment">
+        <button class="${!view3d ? 'aktiv' : ''}" data-action="view-2d">2D</button>
+        <button class="${view3d ? 'aktiv' : ''}" data-action="view-3d">3D</button>
+      </div>
     </section>
     <div class="aktionen">
       <button class="haupt" data-action="starten">Auf diesem Gerät spielen</button>
@@ -643,7 +693,7 @@ function viewMenu() {
       ${hasSave ? '<button class="neben" data-action="fortsetzen">Letzte Partie fortsetzen</button>' : ''}
       <button class="neben" data-action="regeln">Regeln</button>
     </div>
-    <p class="fuss">Auf einem Gerät wird nach jedem Zug weitergereicht. Online spielt jeder auf seinem eigenen Handy.</p>
+    <p class="fuss">Auf einem Gerät wird nach jedem Zug weitergereicht. Online spielt jeder auf seinem eigenen Handy.${view3d ? ' 3D-Ansicht aktiv (?view=3d).' : ''}</p>
   </div>`;
 }
 
@@ -693,7 +743,7 @@ function viewOrders() {
   const sel = app.selection;
   const highlight = sel && sel.mode ? validTargets(sel.unitId, sel.mode) : [];
 
-  const board = boardSvg({
+  const board = brettContent({
     state: g,
     orders: app.working.unitOrders,
     selection: sel,
@@ -749,7 +799,7 @@ function viewOrders() {
   return `
   <div class="seite spiel" style="--spieler:${p.color}">
     ${statusBar(g, me)}
-    <div class="brett">${board}</div>
+    <div class="brett${isView3d() ? ' brett-3d' : ''}">${board}</div>
     ${panel}
     <div class="aktionen fix">
       <button class="haupt" data-action="befehle-fertig">Befehle abschließen</button>
@@ -760,7 +810,7 @@ function viewOrders() {
 }
 
 function viewReveal(g, merged, onlineModus = false) {
-  const board = boardSvg({ state: g, orders: merged.unitOrders, showOrdersOf: 'alle', viewerId: null });
+  const board = brettContent({ state: g, orders: merged.unitOrders, showOrdersOf: 'alle', viewerId: null });
   const buildRows = g.players
     .filter((p) => merged.builds[p.id])
     .map((p) => `<li><span class="punkt" style="background:${p.color}"></span>${esc(p.name)} baut ${TYPE_INFO[merged.builds[p.id]].name}</li>`)
@@ -768,7 +818,7 @@ function viewReveal(g, merged, onlineModus = false) {
   return `
   <div class="seite spiel">
     ${statusBar(g, null)}
-    <div class="brett">${board}</div>
+    <div class="brett${isView3d() ? ' brett-3d' : ''}">${board}</div>
     <div class="panel">
       <div class="panel-kopf"><strong>Alle Befehle offen</strong></div>
       <p class="hinweis">Durchgezogen = Bewegung, gestrichelt = Unterstützung.</p>
@@ -781,7 +831,7 @@ function viewReveal(g, merged, onlineModus = false) {
 }
 
 function viewResult(g, r, onlineModus = false) {
-  const board = boardSvg({ state: g, orders: {}, viewerId: null, showOrdersOf: null });
+  const board = brettContent({ state: g, orders: {}, viewerId: null, showOrdersOf: null });
   const items = r.events.map((e) => describeEvent(r.before, e)).filter(Boolean);
   const list = items.length
     ? items.map((i) => `<li><span class="ikon" style="color:${i.owner !== undefined && g.players[i.owner] ? g.players[i.owner].color : 'inherit'}">${i.icon}</span> ${esc(i.text)}</li>`).join('')
@@ -789,7 +839,7 @@ function viewResult(g, r, onlineModus = false) {
   return `
   <div class="seite spiel">
     ${statusBar(g, null)}
-    <div class="brett">${board}</div>
+    <div class="brett${isView3d() ? ' brett-3d' : ''}">${board}</div>
     <div class="panel scroll">
       <div class="panel-kopf"><strong>Auswertung Runde ${r.before.round}</strong></div>
       <ul class="liste">${list}</ul>

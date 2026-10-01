@@ -143,6 +143,15 @@ button.aktiv { background: var(--spieler); border-color: var(--spieler); color: 
 
 .brett { display: flex; justify-content: center; }
 .board { width: 100%; max-width: min(92vw, 460px); height: auto; display: block; touch-action: manipulation; }
+.brett-3d, .brett-3d-host { width: 100%; max-width: min(92vw, 460px); }
+.brett-3d-host { position: relative; }
+.board3d-canvas {
+  width: 100%;
+  display: block;
+  border-radius: 12px;
+  touch-action: none;
+  background: radial-gradient(ellipse at 50% 30%, #1a2236 0%, #0f1420 70%);
+}
 
 .kante { stroke: #38435c; stroke-width: .035; }
 .knoten { fill: #222b3f; stroke: #3d4a66; stroke-width: .05; }

@@ -270,7 +270,7 @@ export function viewWarten({ sitzung, statusHtml, brettHtml, wartetSeit }) {
   return `
   <div class="seite spiel">
     ${statusHtml}
-    <div class="brett">${brettHtml}</div>
+    <div class="brett${brettHtml.includes('data-board3d') ? ' brett-3d' : ''}">${brettHtml}</div>
     <div class="panel">
       <div class="panel-kopf"><strong>Befehle abgegeben</strong><span class="badge">Runde ${sitzung.spiel.round}</span></div>
       <p class="hinweis">Es fehlen noch:</p>
@@ -292,7 +292,7 @@ export function viewOnlineBot({ sitzung, statusHtml, brettHtml }) {
   return `
   <div class="seite spiel">
     ${statusHtml}
-    <div class="brett">${brettHtml}</div>
+    <div class="brett${brettHtml.includes('data-board3d') ? ' brett-3d' : ''}">${brettHtml}</div>
     <div class="panel">
       <div class="panel-kopf"><strong>Dein Platz wird von einem Bot gespielt</strong></div>
       <p class="hinweis">Du kannst zuschauen, wie die Partie zu Ende geht.</p>

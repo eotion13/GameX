@@ -94,9 +94,15 @@ src/net/       Online-Modus
   firebase.js    REST-Zugriff auf Firebase (kein SDK, kein CDN)
   config.js      Zugangsdaten aus Link, Speicher oder Datei
 src/ui/        Oberfläche (Vanilla JS, kein Framework)
+  board.js       2D-SVG-Brett
+  board3d.js     optionale 3D-Ansicht (Three.js, Feature-Flag ?view=3d)
+vendor/three/  gepinnte Three.js r170 (MIT)
 tests/         Unit-Tests (node --test)
 tools/         Simulation, Server, Oberflächentests, Icon-Erzeugung
 ```
+
+Die 3D-Ansicht ist reine Präsentation über derselben Engine: Menü **Ansicht → 3D**,
+oder URL `?view=3d`. Ohne Flag bleibt das SVG-Brett.
 
 Der Kern ist eine reine Funktion:
 
