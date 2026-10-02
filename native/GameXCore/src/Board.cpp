@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 namespace gamex {
 
@@ -30,8 +31,9 @@ std::string nodeId(int ring, int spoke) {
 }
 
 Board createBoard(int playerCount, const Config& config) {
-  if (playerCount < 2) playerCount = 2;
-  if (playerCount > 6) playerCount = 6;
+  if (playerCount < 2 || playerCount > 6) {
+    throw std::runtime_error("Spielerzahl muss zwischen 2 und 6 liegen");
+  }
   Board board;
   board.playerCount = playerCount;
   board.rings = config.rings;
