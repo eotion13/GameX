@@ -34,8 +34,10 @@ Nicht ein leeres „New Project“ aus dem Launcher (außer zum Testen, dass der
 
 ## Was du danach siehst / tun sollst
 
-- Editor offen → kurz Bescheid: „Editor offen“ + welche UE-Version (z. B. 5.5.4)
-- Ich verdrahte dann Brett, Einheiten-Platzhalter, Kamera und Reveal über GameXCore
+1. Modules kompilieren lassen (Yes)
+2. **Play** (Alt+P) — GameMode spawnt das Brett aus GameXCore (Zylinder/Wege/Quellen)
+3. Kamera: `AGameXStrategyCamera` (Zoom/Orbit)
+4. Kurz Bescheid: „Editor offen“ / „Play geht“ + UE-Version + Fehler falls welche
 
 ## Optional: Blender-Platzhalter importieren
 
