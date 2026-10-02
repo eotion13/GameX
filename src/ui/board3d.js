@@ -7,6 +7,9 @@ import { OrbitControls } from '../../vendor/three/OrbitControls.js';
 import { TYPE_INFO } from '../engine/rules.js';
 import { occupancy } from '../engine/state.js';
 import { createFigureMesh } from './figures.js';
+import {
+  createBaseMarker, createPathSegment, createSourceProp, createTerrainDisk,
+} from './props3d.js';
 import { isView3d, setView3d } from './view-flag.js';
 
 export { isView3d, setView3d };
@@ -58,42 +61,34 @@ export class Board3DView {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a0e18);
-    this.scene.fog = new THREE.Fog(0x0a0e18, 14, 32);
+    this.scene.background = new THREE.Color(0x0c121c);
+    this.scene.fog = new THREE.Fog(0x0c121c, 16, 36);
     this.scene.add(this._content);
 
-    this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 80);
-    this.camera.position.set(0, 9, 7.5);
+    this.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 80);
+    this.camera.position.set(0, 9.2, 8.2);
     this.camera.lookAt(0, 0, 0);
 
-    // Weiches Environment: Hemisphaere + Key + kühler Rim (eine Key-Light, mobilfreundlich)
-    const hemi = new THREE.HemisphereLight(0xc5d4f0, 0x1c1812, 0.55);
-    const key = new THREE.DirectionalLight(0xfff2d6, 0.9);
-    key.position.set(5, 12, 4);
-    const rim = new THREE.DirectionalLight(0x7a9cff, 0.28);
-    rim.position.set(-6, 4, -5);
-    this.scene.add(hemi, key, rim);
-
-    // Dezente Boden-Aura (kein Shadow-Map — Leistungsbudget)
-    const glow = new THREE.Mesh(
-      new THREE.CircleGeometry(8, 48),
-      new THREE.MeshBasicMaterial({
-        color: 0x1a2740, transparent: true, opacity: 0.35, depthWrite: false,
-      }),
-    );
-    glow.rotation.x = -Math.PI / 2;
-    glow.position.y = -0.06;
-    this.scene.add(glow);
+    // Weiches Environment: Hemisphaere + warmes Key + kühler Rim (mobilfreundlich)
+    const hemi = new THREE.HemisphereLight(0xd6cfc0, 0x1a2218, 0.62);
+    const key = new THREE.DirectionalLight(0xffe6c4, 1.05);
+    key.position.set(6, 14, 5);
+    const rim = new THREE.DirectionalLight(0x6a88b8, 0.32);
+    rim.position.set(-7, 5, -6);
+    const fill = new THREE.DirectionalLight(0xb8c8e0, 0.18);
+    fill.position.set(0, 8, -8);
+    this.scene.add(hemi, key, rim, fill);
 
     this.controls = new OrbitControls(this.camera, this.canvas);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
-    this.controls.enablePan = false;
+    this.controls.enablePan = true;
+    this.controls.panSpeed = 0.45;
     this.controls.minDistance = 5;
     this.controls.maxDistance = 16;
-    // Top-down-ish: kein flacher Cheat-Winkel auf Gegnerbefehle
-    this.controls.minPolarAngle = 0.18;
-    this.controls.maxPolarAngle = Math.PI * 0.42;
+    // Isometrisch / schräg von oben — kein flacher Cheat-Winkel
+    this.controls.minPolarAngle = 0.22;
+    this.controls.maxPolarAngle = Math.PI * 0.44;
     this.controls.target.set(0, 0, 0);
 
     this._onPointerDown = (ev) => {
@@ -275,7 +270,7 @@ export class Board3DView {
     this._pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     this._raycaster.setFromCamera(this._pointer, this.camera);
     const targets = [...this._nodeMeshes.values()];
-    const hits = this._raycaster.intersectObjects(targets, false);
+    const hits = this._raycaster.intersectObjects(targets, true);
     if (hits.length) {
       const nodeId = hits[0].object.userData.nodeId;
       if (nodeId) this.onNodeTap(nodeId);
@@ -301,20 +296,12 @@ export class Board3DView {
     const animateOrders = !!o.animateOrders;
     const initialOrderOpacity = animateOrders ? 0 : 1;
 
-    const floor = new THREE.Mesh(
-      new THREE.CircleGeometry((board.radius || board.rings) + 1.4, 48),
-      new THREE.MeshStandardMaterial({
-        color: 0x141b2a, roughness: 0.88, metalness: 0.08,
-        emissive: 0x0a1220, emissiveIntensity: 0.25,
-      }),
-    );
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.04;
-    this._content.add(floor);
+    const terrainR = (board.radius || board.rings) + 1.6;
+    this._content.add(createTerrainDisk(terrainR));
 
     const drawn = new Set();
-    const edgeMat = new THREE.MeshStandardMaterial({
-      color: 0x3a4560, roughness: 0.7, metalness: 0.15,
+    const pathMat = new THREE.MeshStandardMaterial({
+      color: 0x5a5346, roughness: 0.88, metalness: 0.06,
     });
     for (const id of board.order) {
       const a = board.nodes[id];
@@ -323,18 +310,7 @@ export class Board3DView {
         if (drawn.has(key)) continue;
         drawn.add(key);
         const b = board.nodes[nb];
-        const dx = b.x - a.x;
-        const dz = b.y - a.y;
-        const len = Math.hypot(dx, dz) || 1;
-        const midX = (a.x + b.x) / 2;
-        const midZ = (a.y + b.y) / 2;
-        const bridge = new THREE.Mesh(
-          new THREE.BoxGeometry(len * 0.92, 0.05, 0.1),
-          edgeMat,
-        );
-        bridge.position.set(midX, 0.025, midZ);
-        bridge.rotation.y = -Math.atan2(dz, dx);
-        this._content.add(bridge);
+        this._content.add(createPathSegment(a.x, a.y, b.x, b.y, pathMat));
       }
     }
 
@@ -343,18 +319,18 @@ export class Board3DView {
       const controller = state.control[id];
       const isZiel = highlight.has(id);
 
-      let platColor = 0x222b3f;
-      if (n.isSource) platColor = 0x3a3420;
-      if (isZiel) platColor = 0x5a5430;
+      let platColor = 0x3a414f;
+      if (n.isSource) platColor = 0x4a4538;
+      if (isZiel) platColor = 0x6a6040;
 
       const plat = new THREE.Mesh(
-        new THREE.CylinderGeometry(NODE_R, NODE_R * 1.05, 0.1, 20),
+        new THREE.CylinderGeometry(NODE_R, NODE_R * 1.08, 0.12, 22),
         new THREE.MeshStandardMaterial({
           color: platColor,
-          emissive: n.isSource ? 0x3a2e10 : 0x000000,
-          emissiveIntensity: n.isSource ? 0.35 : 0,
-          roughness: 0.65,
-          metalness: 0.1,
+          emissive: isZiel ? 0x4a3a18 : 0x000000,
+          emissiveIntensity: isZiel ? 0.4 : 0,
+          roughness: 0.72,
+          metalness: 0.08,
         }),
       );
       plat.position.set(n.x, 0.05, n.y);
@@ -363,7 +339,7 @@ export class Board3DView {
       this._nodeMeshes.set(id, plat);
 
       const hit = new THREE.Mesh(
-        new THREE.CylinderGeometry(NODE_R + 0.18, NODE_R + 0.18, 0.2, 12),
+        new THREE.CylinderGeometry(NODE_R + 0.2, NODE_R + 0.2, 0.22, 12),
         new THREE.MeshBasicMaterial({ visible: false }),
       );
       hit.position.copy(plat.position);
@@ -371,42 +347,35 @@ export class Board3DView {
       this._content.add(hit);
       this._nodeMeshes.set(`${id}__hit`, hit);
 
-      if (controller !== null && controller !== undefined) {
+      if (n.base !== null && n.base !== undefined) {
+        const col = hexColor(state.players[n.base].color);
+        const marker = createBaseMarker(col);
+        marker.position.set(n.x, 0, n.y);
+        this._content.add(marker);
+      }
+
+      if (n.isSource) {
+        const banner = (controller !== null && controller !== undefined)
+          ? hexColor(state.players[controller].color)
+          : null;
+        const well = createSourceProp(banner);
+        // leicht versetzt wenn belegt, damit Figur Platz hat
+        const ox = occ[id] ? -0.2 : 0;
+        const oz = occ[id] ? -0.2 : 0;
+        well.position.set(n.x + ox, 0.1, n.y + oz);
+        well.scale.setScalar(occ[id] ? 0.85 : 1);
+        this._content.add(well);
+      } else if (controller !== null && controller !== undefined) {
         const col = hexColor(state.players[controller].color);
         const ring = new THREE.Mesh(
           new THREE.RingGeometry(NODE_R + 0.02, NODE_R + 0.14, 24),
           new THREE.MeshBasicMaterial({
-            color: col, transparent: true, opacity: 0.55, side: THREE.DoubleSide,
+            color: col, transparent: true, opacity: 0.5, side: THREE.DoubleSide,
           }),
         );
         ring.rotation.x = -Math.PI / 2;
-        ring.position.set(n.x, 0.11, n.y);
+        ring.position.set(n.x, 0.12, n.y);
         this._content.add(ring);
-      }
-
-      if (n.base !== null) {
-        const col = hexColor(state.players[n.base].color);
-        const base = new THREE.Mesh(
-          new THREE.BoxGeometry(NODE_R * 2.2, 0.06, NODE_R * 2.2),
-          new THREE.MeshStandardMaterial({
-            color: col, transparent: true, opacity: 0.35, roughness: 0.5,
-          }),
-        );
-        base.position.set(n.x, 0.02, n.y);
-        this._content.add(base);
-      }
-
-      if (n.isSource) {
-        const gem = new THREE.Mesh(
-          new THREE.OctahedronGeometry(occ[id] ? 0.09 : 0.13, 0),
-          new THREE.MeshStandardMaterial({
-            color: 0xffd166, emissive: 0xaa8800, emissiveIntensity: 0.5, roughness: 0.35,
-          }),
-        );
-        const ox = occ[id] ? -0.22 : 0;
-        const oz = occ[id] ? -0.22 : 0;
-        gem.position.set(n.x + ox, occ[id] ? 0.22 : 0.28, n.y + oz);
-        this._content.add(gem);
       }
     }
 
@@ -422,24 +391,29 @@ export class Board3DView {
       const b = board.nodes[ord.target];
       if (!b) continue;
       const col = hexColor(state.players[u.owner].color);
-      const y = 0.35;
+      const y = 0.38;
       const points = [
         new THREE.Vector3(a.x, y, a.y),
         new THREE.Vector3(b.x, y, b.y),
       ];
-      const baseOp = ord.action === 'bewegen' ? 0.95 : 0.55;
+      const isMove = ord.action === 'bewegen';
+      const baseOp = isMove ? 0.95 : 0.65;
       const geo = new THREE.BufferGeometry().setFromPoints(points);
-      const mat = new THREE.LineBasicMaterial({
-        color: col,
-        transparent: true,
-        opacity: baseOp * initialOrderOpacity,
-      });
+      const mat = isMove
+        ? new THREE.LineBasicMaterial({
+          color: col, transparent: true, opacity: baseOp * initialOrderOpacity,
+        })
+        : new THREE.LineDashedMaterial({
+          color: col, transparent: true, opacity: baseOp * initialOrderOpacity,
+          dashSize: 0.12, gapSize: 0.08,
+        });
       const line = new THREE.Line(geo, mat);
+      if (!isMove) line.computeLineDistances();
       line.userData.baseOpacity = baseOp;
       this._orderGroup.add(line);
-      if (ord.action !== 'bewegen') {
+      if (!isMove) {
         const tip = new THREE.Mesh(
-          new THREE.SphereGeometry(0.08, 10, 10),
+          new THREE.SphereGeometry(0.07, 10, 10),
           new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: baseOp * initialOrderOpacity }),
         );
         tip.position.set(b.x, y, b.y);

@@ -1,59 +1,93 @@
-// Typunterscheidbare Figuren (Stufe 1: Code-Meshes, kein Blender/GLB noetig).
-// Silhouetten klar: Reiter (spitz/vorwaerts), Bogen (schlank+Bogen), Schild (breit+Platte).
+// Typunterscheidbare Figuren (Code-Meshes).
+// Koerper = neutrales Material; Spielerfarbe nur auf Akzenten (Schild/Banner/Cape).
 
 import * as THREE from '../../vendor/three/three.module.min.js';
 
-/**
- * Baut eine zusammengesetzte Geometrie fuer den Einheitstyp.
- * Pivot unten mittig; Y nach oben. Aufrufer faerbt per Material.
- */
-export function createFigureGeometry(type) {
-  if (type === 'reiter') return mergeGeometries([
-    // Rumpf
-    box(0.22, 0.22, 0.36, 0, 0.28, 0),
-    // Hals/Kopf nach vorne
-    cone(0.1, 0.22, 6, 0, 0.42, -0.22, Math.PI / 2, 0, 0),
-    // Beine
-    cyl(0.04, 0.04, 0.2, 6, -0.08, 0.1, 0.1),
-    cyl(0.04, 0.04, 0.2, 6, 0.08, 0.1, 0.1),
-    cyl(0.04, 0.04, 0.2, 6, -0.08, 0.1, -0.1),
-    cyl(0.04, 0.04, 0.2, 6, 0.08, 0.1, -0.1),
-  ]);
-  if (type === 'bogen') return mergeGeometries([
-    // schlanker Koerper
-    cyl(0.07, 0.09, 0.48, 8, 0, 0.24, 0),
-    // Bogen (Torus-Segment als Ring hinten)
-    torus(0.2, 0.035, 6, 12, Math.PI, 0.12, 0.32, 0, 0, Math.PI / 2, 0),
-    // Pfeilspitze oben
-    cone(0.05, 0.12, 6, 0, 0.55, 0, 0, 0, 0),
-  ]);
-  // schild
-  return mergeGeometries([
-    // Koerper hinter dem Schild
-    cyl(0.08, 0.1, 0.36, 8, 0, 0.2, 0.06),
-    // Schildplatte (breit, flach)
-    box(0.42, 0.48, 0.08, 0, 0.28, -0.06),
-    // Schildbuckel
-    sphere(0.06, 8, 6, 0, 0.28, -0.12),
-  ]);
-}
+const BODY = 0x7a7468;
+const LEATHER = 0x4a3c2e;
+const METAL = 0x8a9098;
 
-export function createFigureMesh(type, color, opts = {}) {
-  const geo = createFigureGeometry(type);
-  const mat = new THREE.MeshStandardMaterial({
-    color,
+/**
+ * @param {string} type reiter|bogen|schild
+ * @param {THREE.Color|number|string} accentColor Spielerfarbe fuer Akzente
+ * @param {object} [opts]
+ * @returns {THREE.Group}
+ */
+export function createFigureMesh(type, accentColor, opts = {}) {
+  const accent = accentColor instanceof THREE.Color
+    ? accentColor
+    : new THREE.Color(accentColor || '#888888');
+
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: BODY, roughness: 0.55, metalness: 0.18,
     emissive: opts.emissive || 0x000000,
     emissiveIntensity: opts.emissiveIntensity || 0,
-    roughness: 0.42,
-    metalness: 0.22,
   });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.userData.unitType = type;
-  mesh.castShadow = false;
-  return mesh;
+  const leatherMat = new THREE.MeshStandardMaterial({
+    color: LEATHER, roughness: 0.75, metalness: 0.05,
+    emissive: opts.emissive || 0x000000,
+    emissiveIntensity: (opts.emissiveIntensity || 0) * 0.5,
+  });
+  const metalMat = new THREE.MeshStandardMaterial({
+    color: METAL, roughness: 0.35, metalness: 0.55,
+  });
+  const accentMat = new THREE.MeshStandardMaterial({
+    color: accent, roughness: 0.45, metalness: 0.15,
+    emissive: accent, emissiveIntensity: 0.08 + (opts.emissiveIntensity || 0) * 0.4,
+  });
+
+  const root = new THREE.Group();
+  root.userData.unitType = type;
+
+  if (type === 'reiter') {
+    // Pferd
+    root.add(mesh(box(0.22, 0.22, 0.36, 0, 0.28, 0), leatherMat));
+    root.add(mesh(cone(0.1, 0.22, 6, 0, 0.42, -0.22, Math.PI / 2, 0, 0), leatherMat));
+    for (const [x, z] of [[-0.08, 0.1], [0.08, 0.1], [-0.08, -0.1], [0.08, -0.1]]) {
+      root.add(mesh(cyl(0.04, 0.04, 0.2, 6, x, 0.1, z), leatherMat));
+    }
+    // Reiter + Cape (Akzent)
+    root.add(mesh(cyl(0.07, 0.08, 0.22, 8, 0, 0.48, 0.02), bodyMat));
+    root.add(mesh(box(0.16, 0.2, 0.06, 0, 0.48, 0.12), accentMat));
+  } else if (type === 'bogen') {
+    root.add(mesh(cyl(0.07, 0.09, 0.48, 8, 0, 0.24, 0), bodyMat));
+    root.add(mesh(torus(0.2, 0.035, 6, 12, Math.PI, 0.12, 0.32, 0, 0, Math.PI / 2, 0), metalMat));
+    root.add(mesh(cone(0.05, 0.12, 6, 0, 0.55, 0, 0, 0, 0), metalMat));
+    // Kocher / Schulterband (Akzent)
+    root.add(mesh(cyl(0.05, 0.05, 0.18, 6, 0.12, 0.28, -0.02), accentMat));
+    root.add(mesh(box(0.14, 0.08, 0.04, 0, 0.4, 0.08), accentMat));
+  } else {
+    // schild
+    root.add(mesh(cyl(0.08, 0.1, 0.36, 8, 0, 0.2, 0.06), bodyMat));
+    root.add(mesh(box(0.42, 0.48, 0.08, 0, 0.28, -0.06), accentMat));
+    root.add(mesh(sphere(0.06, 8, 6, 0, 0.28, -0.12), metalMat));
+  }
+
+  root.traverse((o) => {
+    if (o.isMesh) o.userData.unitType = type;
+  });
+  return root;
 }
 
-// --------------------------------------------------------------- helpers
+/** @deprecated Geometrie-API bleibt fuer Tests; bevorzugte API ist createFigureMesh. */
+export function createFigureGeometry(type) {
+  // Flatten: merge first mesh children of a temp figure for legacy callers.
+  const g = createFigureMesh(type, 0x888888);
+  const geos = [];
+  g.traverse((o) => {
+    if (o.isMesh && o.geometry) {
+      const clone = o.geometry.clone();
+      o.updateWorldMatrix(true, false);
+      clone.applyMatrix4(o.matrixWorld);
+      geos.push(clone);
+    }
+  });
+  return mergeGeometries(geos);
+}
+
+function mesh(geo, mat) {
+  return new THREE.Mesh(geo, mat);
+}
 
 function box(w, h, d, x, y, z) {
   const g = new THREE.BoxGeometry(w, h, d);
@@ -92,7 +126,6 @@ function torus(r, tube, radSeg, tubeSeg, arc, x, y, z, rx = 0, ry = 0, rz = 0) {
 }
 
 function mergeGeometries(list) {
-  // Manuelles Merge ohne BufferGeometryUtils-Addon (kein Extra-Vendor).
   let totalVerts = 0;
   let totalIdx = 0;
   const prepared = list.map((g) => {

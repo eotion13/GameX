@@ -56,14 +56,21 @@ Source of Truth: JavaScript-Engine in `src/engine/`.
 - [x] Blender-Platzhalter FBX/Blend erzeugt
 - [x] `libstdc++` Dev-Paket für Cloud-Builds
 
+## Parallel ohne Unreal-Editor
+
+Unreal ist **nicht** zum Weiterarbeiten nötig. Laufende Arbeit ohne Editor:
+
+- Web-3D-Diorama (spielbar): Quellen-Brunnen, Basen-Banner, Steinwege, Akzentfarben an Figuren
+- Unreal-Quellstubs: BoardActor, StrategyCamera, UnitActor
+- GameXCore-Regression
+
 ## In Arbeit / als Nächstes
 
-1. Golden Fixtures aus JS-Tests exportieren und C++ vollständig dagegen regressen
-2. Epic Games Account / UE 5.5 auf Entwickler-Mac installieren (persönlicher Login)
-3. Unreal: Board-Actor, Kamera-Pawn, Unit-Actors an Core anbinden
-4. Reveal-/Kampf-VFX aus Resolver-Events
-5. Sound-Platzhalterstruktur
-6. Higgsfield-Plugin nach Login einrichten
+1. Epic: UE **5.5** fertig herunterladen/installieren (Intel-Mac; 5.8 geht nicht)
+2. Unreal: Stubs mit GameXCore verdrahten sobald Editor läuft
+3. Reveal-/Kampf-VFX aus Resolver-Events
+4. Sound-Platzhalterstruktur
+5. Higgsfield-Plugin nach Login einrichten
 
 ## Bekannte Blocker (nur persönliche Aktion)
 
