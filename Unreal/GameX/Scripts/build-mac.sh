@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PROJECT="$ROOT/Unreal/GameX/GameX.uproject"
+PROJECT="$ROOT/GameX.uproject"
 
 # Find engine
 ENGINE=""

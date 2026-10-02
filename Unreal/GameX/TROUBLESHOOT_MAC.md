@@ -26,10 +26,16 @@ Wenn der Ordner anders heißt (`UE_5.5.4`), diesen Namen verwenden.
 
 ```bash
 cd ~/Documents/GameX
+bash Unreal/GameX/Scripts/build-mac.sh
+```
 
-ENGINE="/Users/Shared/Epic Games/UE_5.5"   # anpassen!
-"$ENGINE/Engine/Build/BatchFiles/Mac/Build.sh" GameXEditor Mac Development \
-  -Project="$(pwd)/Unreal/GameX/GameX.uproject" -WaitMutex
+Oder manuell (jede Zeile einzeln ausführen, **keine** `#`-Kommentare mitkopieren):
+
+```bash
+cd ~/Documents/GameX
+export ENGINE="/Users/Shared/Epic Games/UE_5.5"
+export PROJECT="$HOME/Documents/GameX/Unreal/GameX/GameX.uproject"
+"$ENGINE/Engine/Build/BatchFiles/Mac/Build.sh" GameXEditor Mac Development -Project="$PROJECT" -WaitMutex
 ```
 
 Danach erneut `open Unreal/GameX/GameX.uproject`.
