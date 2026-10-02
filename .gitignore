@@ -1,4 +1,33 @@
+# GameX / Knotenpunkt
+
 node_modules/
 _site/
 .DS_Store
 *.log
+
+# Native / CMake
+native/GameXCore/build/
+native/**/CMakeCache.txt
+native/**/CMakeFiles/
+native/**/cmake_install.cmake
+native/**/Testing/
+
+# Unreal Engine
+Unreal/GameX/Binaries/
+Unreal/GameX/DerivedDataCache/
+Unreal/GameX/Intermediate/
+Unreal/GameX/Saved/
+Unreal/GameX/.vs/
+Unreal/GameX/*.sln
+Unreal/GameX/*.xcworkspace
+Unreal/GameX/Build/
+
+# Blender backups
+*.blend1
+*.blend2
+
+# OS / IDE
+.idea/
+.vscode/
+*.user
+*.suo

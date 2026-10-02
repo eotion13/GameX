@@ -71,7 +71,9 @@ mitreisen.
 ## Entwicklung
 
 ```bash
-npm test                  # 111 Unit-Tests (Regel-Engine, Regelfragen, Online-Kern)
+npm test                  # 119 Unit-Tests (Regel-Engine, Regelfragen, Online-Kern, Reveal)
+npm run test:native       # C++ GameXCore Regression (CMake/Ninja)
+npm run assets:placeholders  # Blender-Platzhalter (Schild/Bogen/Reiter/Quelle)
 npm run sim               # Bot-gegen-Bot-Simulation (Balance)
 npm run serve             # lokaler Server
 node tools/smoke-test.js  # Oberflächentest im echten Browser
@@ -79,15 +81,23 @@ node tools/online-smoke.js # Online-Modus gegen eine nachgebaute Firebase
 node tools/make-icons.py  # App-Icons neu erzeugen
 ```
 
+3D-/Unreal-Status und Kompatibilitätsgarantie: siehe
+[DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md),
+[GAMEPLAY_COMPATIBILITY.md](GAMEPLAY_COMPATIBILITY.md),
+[ASSET_PIPELINE.md](ASSET_PIPELINE.md).
+
 ### Aufbau
 
 ```
-src/engine/    Regeln – reines JavaScript, kein DOM, keine Zufallsquelle
+src/engine/    Regeln – reines JavaScript, kein DOM, keine Zufallsquelle (Source of Truth)
   rules.js       Konstanten, Typ-Überlegenheit, Siegschwellen
   board.js       Spielfeld-Erzeugung und Nachbarschaft
   state.js       Zustandsdarstellung
   resolver.js    resolve(state, orders) -> neuer Zustand
   bots.js        Zufall / Greedy / Monte-Carlo
+native/GameXCore/  Portabler C++-Spiegel der Engine für Unreal (keine UI)
+Unreal/GameX/      Unreal Engine 5.5 Präsentationsprojekt (Editor lokal)
+assets/blender/    Asset-Pipeline (Platzhalter → hochwertige Modelle)
 src/net/       Online-Modus
   room.js        Raumdaten -> Spielstand falten (rein, ohne Netz)
   online.js      Sitzung: Raum anlegen, beitreten, abgleichen

@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "fixtures": [
+    {
+      "name": "board-p2",
+      "kind": "board",
+      "playerCount": 2,
+      "spokes": 6,
+      "nodeCount": 19,
+      "sourceCount": 7,
+      "bases": [
+        "r3s0",
+        "r3s3"
+      ]
+    },
+    {
+      "name": "board-p3",
+      "kind": "board",
+      "playerCount": 3,
+      "spokes": 6,
+      "nodeCount": 19,
+      "sourceCount": 7,
+      "bases": [
+        "r3s0",
+        "r3s2",
+        "r3s4"
+      ]
+    },
+    {
+      "name": "board-p4",
+      "kind": "board",
+      "playerCount": 4,
+      "spokes": 8,
+      "nodeCount": 25,
+      "sourceCount": 9,
+      "bases": [
+        "r3s0",
+        "r3s2",
+        "r3s4",
+        "r3s6"
+      ]
+    },
+    {
+      "name": "board-p5",
+      "kind": "board",
+      "playerCount": 5,
+      "spokes": 10,
+      "nodeCount": 31,
+      "sourceCount": 11,
+      "bases": [
+        "r3s0",
+        "r3s2",
+        "r3s4",
+        "r3s6",
+        "r3s8"
+      ]
+    },
+    {
+      "name": "board-p6",
+      "kind": "board",
+      "playerCount": 6,
+      "spokes": 12,
+      "nodeCount": 37,
+      "sourceCount": 13,
+      "bases": [
+        "r3s0",
+        "r3s2",
+        "r3s4",
+        "r3s6",
+        "r3s8",
+        "r3s10"
+      ]
+    },
+    {
+      "name": "resolve-all-hold-p3",
+      "kind": "resolve",
+      "playerCount": 3,
+      "roundBefore": 1,
+      "roundAfter": 2,
+      "unitCount": 6,
+      "eventTypes": [],
+      "holdRounds": 2,
+      "beats_reiter_bogen": true
+    }
+  ]
+}

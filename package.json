@@ -6,6 +6,9 @@
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.js",
+    "export:fixtures": "node tools/export-golden-fixtures.js",
+    "test:native": "cmake -S native/GameXCore -B native/GameXCore/build -G Ninja && cmake --build native/GameXCore/build && ctest --test-dir native/GameXCore/build --output-on-failure",
+    "assets:placeholders": "blender --background --python assets/blender/scripts/generate_placeholders.py",
     "sim": "node tools/simulate.js",
     "serve": "node tools/serve.js"
   },
