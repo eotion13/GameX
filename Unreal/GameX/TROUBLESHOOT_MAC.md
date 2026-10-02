@@ -14,14 +14,10 @@ Pfad zur Engine anpassen (`UE_5.5` oder `UE_5.5.4` …):
 
 ```bash
 cd ~/Documents/GameX
+ls "/Users/Shared/Epic Games/"
 
-# Welche Engines sind da?
-ls "/Users/Shared/Epic Games/" 2>/dev/null
-ls ~/Epic\ Games/ 2>/dev/null
-
-# Editor mit Log im Terminal (Beispiel 5.5):
 "/Users/Shared/Epic Games/UE_5.5/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor" \
-  "$(pwd)/Unreal/GameX/GameX.uproject" -log
+  "$HOME/Documents/GameX/Unreal/GameX/GameX.uproject" -log
 ```
 
 Wenn der Ordner anders heißt (`UE_5.5.4`), diesen Namen verwenden.
