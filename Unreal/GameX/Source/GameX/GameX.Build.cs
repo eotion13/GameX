@@ -14,8 +14,7 @@ public class GameX : ModuleRules
 			"InputCore",
 			"UMG",
 			"Slate",
-			"SlateCore",
-			"EnhancedInput"
+			"SlateCore"
 		});
 
 		// Portable rules library (no UE types) — relative to this module.

@@ -13,11 +13,11 @@ Logik liegt in `native/GameXCore` (und parallel in `src/engine/` als Source of T
 
 Dieses Cloud-Environment hat **keinen** UE-Editor und keine GPU; das Projekt wird lokal geöffnet.
 
-## Öffnen
+## Öffnen (Mac)
 
-1. Epic Launcher → Engine 5.5 installieren  
-2. `GameX.uproject` doppelklicken / generieren  
-3. Modul `GameX` kompiliert und linkt gegen `GameXCore`
+Siehe **[SETUP_MAC.md](SETUP_MAC.md)**.
+
+Kurz: Branch `cursor/ue5-3d-presentation-0467` pullen → `GameX.uproject` öffnen → Modules bauen lassen.
 
 ## Module
 
