@@ -74,7 +74,7 @@ Unreal ist **nicht** zum Weiterarbeiten nötig. Laufende Arbeit ohne Editor:
 
 ## Bekannte Blocker (nur persönliche Aktion)
 
-1. **Unreal Engine 5.5:** Bitte Epic Games Account einloggen und Engine 5.5 installieren (Mac/Windows mit GPU). Danach `Unreal/GameX/GameX.uproject` öffnen — ich übernehme Kompilierung, Board-Actors und Anbindung an GameXCore.
+1. ~~Unreal Engine~~ — Editor läuft beim User. **Nächster Schritt:** Repo-Projekt `Unreal/GameX/GameX.uproject` öffnen (siehe `Unreal/GameX/SETUP_MAC.md`), nicht nur ein leeres Launcher-Projekt.
 2. **Higgsfield Blender Plugin:** Account/Login bei Higgsfield erforderlich; bis dahin nutzen wir nur offizielle Blender-Platzhalter (bereits erzeugt).
 
 ## Spielbar heute (Web)
