@@ -7,7 +7,6 @@ public class GameX : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		bEnableExceptions = true;
-		bEnableRTTI = true;
 		bUseUnity = false;
 
 		PublicDependencyModuleNames.AddRange(new string[] {

@@ -30,8 +30,18 @@ fi
 echo "Engine: $ENGINE"
 echo "Project: $PROJECT"
 
-# Ensure Xcode CLT selected
-sudo xcode-select -s /Applications/Xcode.app/Contents/Developer 2>/dev/null || true
+# Point to full Xcode (needed for Mac platform SDK)
+if [[ -d /Applications/Xcode.app/Contents/Developer ]]; then
+  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer || true
+fi
+xcodebuild -license accept 2>/dev/null || true
+xcodebuild -runFirstLaunch 2>/dev/null || true
+
+# Wipe invalid Intermediate BuildRules from wrong CLR / previous failures
+rm -rf "$ROOT/Intermediate/Build/BuildRules" 2>/dev/null || true
+
+echo "xcode-select: $(xcode-select -p)"
+echo "xcodebuild: $(xcodebuild -version 2>&1 | tr '\n' ' ')"
 
 "$ENGINE/Engine/Build/BatchFiles/Mac/Build.sh" GameXEditor Mac Development \
   -Project="$PROJECT" \
