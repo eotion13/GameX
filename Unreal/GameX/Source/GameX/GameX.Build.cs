@@ -7,6 +7,8 @@ public class GameX : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		bEnableExceptions = true;
+		bEnableRTTI = true;
+		bUseUnity = false;
 
 		PublicDependencyModuleNames.AddRange(new string[] {
 			"Core",
@@ -18,10 +20,9 @@ public class GameX : ModuleRules
 			"SlateCore"
 		});
 
-		// Portable rules library (no UE types) — relative to this module.
+		// Headers for portable GameXCore (implementation lives in Source/GameX/Native).
 		string CoreRoot = Path.GetFullPath(Path.Combine(ModuleDirectory, "..", "..", "..", "..", "native", "GameXCore"));
 		PublicIncludePaths.Add(Path.Combine(CoreRoot, "include"));
-		PrivateIncludePaths.Add(Path.Combine(CoreRoot, "src"));
 		PublicDefinitions.Add("GAMEX_WITH_NATIVE_CORE=1");
 	}
 }

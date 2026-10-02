@@ -1,7 +1,6 @@
 #include "GameXBoardActor.h"
 
 #include "Containers/Set.h"
-
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -11,6 +10,23 @@
 #include "GameX/Board.hpp"
 #include "GameX/Rules.hpp"
 #endif
+
+namespace
+{
+	FLinearColor PlayerAccent(int32 Index)
+	{
+		static const FLinearColor Colors[] = {
+			FLinearColor(0.89f, 0.34f, 0.18f),
+			FLinearColor(0.18f, 0.53f, 0.67f),
+			FLinearColor(0.25f, 0.64f, 0.30f),
+			FLinearColor(0.85f, 0.64f, 0.02f),
+			FLinearColor(0.56f, 0.37f, 0.64f),
+			FLinearColor(0.00f, 0.65f, 0.65f),
+		};
+		const int32 i = FMath::Clamp(Index, 0, 5);
+		return Colors[i];
+	}
+}
 
 AGameXBoardActor::AGameXBoardActor()
 {
@@ -36,7 +52,7 @@ AGameXBoardActor::AGameXBoardActor()
 void AGameXBoardActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	RebuildBoard(PlayerCount);
+	// Do not rebuild here — dynamic components belong in BeginPlay / explicit RebuildBoard.
 }
 
 void AGameXBoardActor::BeginPlay()
@@ -47,8 +63,8 @@ void AGameXBoardActor::BeginPlay()
 
 void AGameXBoardActor::ClearVisuals()
 {
-	TArray<USceneComponent*> Roots = { NodesRoot, PathsRoot, SourcesRoot };
-	for (USceneComponent* R : Roots)
+	TArray<USceneComponent*> RootsArr = { NodesRoot, PathsRoot, SourcesRoot };
+	for (USceneComponent* R : RootsArr)
 	{
 		if (!R) continue;
 		TArray<USceneComponent*> Children;
@@ -84,7 +100,6 @@ UStaticMeshComponent* AGameXBoardActor::AddMesh(
 		if (UMaterialInstanceDynamic* Dyn = Comp->CreateDynamicMaterialInstance(0, BaseMat))
 		{
 			Dyn->SetVectorParameterValue(TEXT("Color"), Color);
-			// BasicShapes often use "BaseColor"
 			Dyn->SetVectorParameterValue(TEXT("BaseColor"), Color);
 		}
 	}
@@ -99,93 +114,53 @@ void AGameXBoardActor::RebuildBoard(int32 InPlayerCount)
 #if !GAMEX_WITH_NATIVE_CORE
 	return;
 #else
-	try
+	const gamex::Board CoreBoard = gamex::createBoard(PlayerCount, gamex::Config{});
+	TSet<FString> Drawn;
+
+	const FLinearColor PathColor(0.35f, 0.32f, 0.28f);
+	const FLinearColor NodeColor(0.25f, 0.28f, 0.34f);
+	const FLinearColor SourceColor(0.55f, 0.48f, 0.28f);
+	const FLinearColor WaterColor(0.25f, 0.45f, 0.55f);
+
+	for (const std::string& Id : CoreBoard.order)
 	{
-		const gamex::Board Board = gamex::createBoard(PlayerCount, gamex::Config{});
-		TSet<FString> Drawn;
-
-		const FLinearColor PathColor(0.35f, 0.32f, 0.28f);
-		const FLinearColor NodeColor(0.25f, 0.28f, 0.34f);
-		const FLinearColor SourceColor(0.55f, 0.48f, 0.28f);
-		const FLinearColor WaterColor(0.25f, 0.45f, 0.55f);
-
-		for (const std::string& Id : Board.order)
+		const gamex::Node& A = CoreBoard.nodes.at(Id);
+		for (const std::string& Nb : A.neighbors)
 		{
-			const gamex::Node& A = Board.nodes.at(Id);
-			for (const std::string& Nb : A.neighbors)
-			{
-				const FString Key = (Id < Nb)
-					? FString(Id.c_str()) + TEXT("|") + FString(Nb.c_str())
-					: FString(Nb.c_str()) + TEXT("|") + FString(Id.c_str());
-				if (Drawn.Contains(Key)) continue;
-				Drawn.Add(Key);
+			const FString Key = (Id < Nb)
+				? FString(Id.c_str()) + TEXT("|") + FString(Nb.c_str())
+				: FString(Nb.c_str()) + TEXT("|") + FString(Id.c_str());
+			if (Drawn.Contains(Key)) continue;
+			Drawn.Add(Key);
 
-				const gamex::Node& B = Board.nodes.at(Nb);
-				const FVector PA(A.x * WorldScale, A.y * WorldScale, 2.f);
-				const FVector PB(B.x * WorldScale, B.y * WorldScale, 2.f);
-				const FVector Mid = (PA + PB) * 0.5f;
-				const FVector Delta = PB - PA;
-				const float Len = Delta.Size();
-				const FRotator Rot = Delta.Rotation();
-				AddMesh(
-					PathsRoot,
-					CubeMesh,
-					Mid,
-					FVector(Len / 100.f, 0.12f, 0.04f),
-					Rot,
-					PathColor);
-			}
-		}
-
-		for (const std::string& Id : Board.order)
-		{
-			const gamex::Node& N = Board.nodes.at(Id);
-			const FVector Loc(N.x * WorldScale, N.y * WorldScale, 8.f);
-			const bool bSource = N.isSource;
-			AddMesh(
-				NodesRoot,
-				CylinderMesh,
-				Loc,
-				FVector(0.55f, 0.55f, 0.08f),
-				FRotator::ZeroRotator,
-				bSource ? SourceColor : NodeColor);
-
-			if (bSource)
-			{
-				AddMesh(
-					SourcesRoot,
-					CylinderMesh,
-					Loc + FVector(0, 0, 18.f),
-					FVector(0.35f, 0.35f, 0.12f),
-					FRotator::ZeroRotator,
-					SourceColor);
-				AddMesh(
-					SourcesRoot,
-					SphereMesh,
-					Loc + FVector(0, 0, 28.f),
-					FVector(0.22f),
-					FRotator::ZeroRotator,
-					WaterColor);
-			}
-
-			if (N.base.has_value())
-			{
-				const int32 P = *N.base;
-				const FLinearColor Accent = FLinearColor::MakeFromHSV8(
-					static_cast<uint8>((P * 47) % 255), 180, 220);
-				AddMesh(
-					NodesRoot,
-					CubeMesh,
-					Loc + FVector(0, 0, -6.f),
-					FVector(0.85f, 0.85f, 0.06f),
-					FRotator::ZeroRotator,
-					Accent);
-			}
+			const gamex::Node& B = CoreBoard.nodes.at(Nb);
+			const FVector PA(A.x * WorldScale, A.y * WorldScale, 2.f);
+			const FVector PB(B.x * WorldScale, B.y * WorldScale, 2.f);
+			const FVector Mid = (PA + PB) * 0.5f;
+			const FVector Delta = PB - PA;
+			const float Len = FMath::Max(Delta.Size(), 1.f);
+			const FRotator Rot = Delta.GetSafeNormal().Rotation();
+			AddMesh(PathsRoot, CubeMesh, Mid, FVector(Len / 100.f, 0.12f, 0.04f), Rot, PathColor);
 		}
 	}
-	catch (...)
+
+	for (const std::string& Id : CoreBoard.order)
 	{
-		UE_LOG(LogTemp, Error, TEXT("GameXBoardActor: createBoard failed"));
+		const gamex::Node& N = CoreBoard.nodes.at(Id);
+		const FVector Loc(N.x * WorldScale, N.y * WorldScale, 8.f);
+		const bool bSource = N.isSource;
+		AddMesh(NodesRoot, CylinderMesh, Loc, FVector(0.55f, 0.55f, 0.08f), FRotator::ZeroRotator, bSource ? SourceColor : NodeColor);
+
+		if (bSource)
+		{
+			AddMesh(SourcesRoot, CylinderMesh, Loc + FVector(0, 0, 18.f), FVector(0.35f, 0.35f, 0.12f), FRotator::ZeroRotator, SourceColor);
+			AddMesh(SourcesRoot, SphereMesh, Loc + FVector(0, 0, 28.f), FVector(0.22f), FRotator::ZeroRotator, WaterColor);
+		}
+
+		if (N.base.has_value())
+		{
+			AddMesh(NodesRoot, CubeMesh, Loc + FVector(0, 0, -6.f), FVector(0.85f, 0.85f, 0.06f), FRotator::ZeroRotator, PlayerAccent(*N.base));
+		}
 	}
 #endif
 }
